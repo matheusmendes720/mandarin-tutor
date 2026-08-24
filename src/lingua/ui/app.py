@@ -1,6 +1,7 @@
 """Gradio app — unified language learning interface."""
 import gradio as gr
 from src.lingua.pronunciation.scorer import compute_phoneme_score, align_phonemes
+from src.lingua.pronunciation.whisper_scoring import WhisperPhonemeScorer
 from src.lingua.vocab.scheduler import Card, ReviewQuality, fsrs_schedule, create_card, get_due_cards
 from src.lingua.vocab.store import JsonStore
 from src.lingua.voice_agent.session import build_tutor_prompt, VoiceAgentConfig, Message, ConversationRole
@@ -8,6 +9,7 @@ from src.lingua.voice_agent.session import build_tutor_prompt, VoiceAgentConfig,
 _store = JsonStore()
 _active_cards: list[Card] = []
 _review_queue: list[Card] = []
+_whisper_scorer = WhisperPhonemeScorer()
 
 
 def _load_cards() -> None:
@@ -24,10 +26,20 @@ _load_cards()
 
 
 def score_pronunciation(audio, text: str) -> str:
-    """Score pronunciation against target text. Stub — replace with Whisper+g2p."""
+    """Score pronunciation against target text using Whisper + g2p."""
     if audio is None:
         return "Please record audio first."
-    return f"Pronunciation score: 82% — good effort. Work on the final vowel length."
+    if not text:
+        return "Please enter target text to score against."
+    try:
+        result = _whisper_scorer.score(audio, text)
+        if "error" in result:
+            return f"Error: {result.get('error', 'Unknown error')}"
+        score = result["score"]
+        transcription = result["transcription"]
+        return f"Pronunciation score: {score}% — transcribed: '{transcription}'"
+    except Exception as e:
+        return f"Error scoring pronunciation: {e}"
 
 
 def add_flashcard(front: str, back: str) -> tuple[list[str], list[str]]:
