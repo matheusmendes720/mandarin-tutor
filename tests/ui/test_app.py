@@ -10,8 +10,8 @@ def test_build_app_returns_blocks():
     assert isinstance(app, gr.Blocks)
 
 
-def test_app_has_four_tabs():
-    """Test that the app has 4 tabs with correct names."""
+def test_app_has_five_tabs():
+    """Test that the app has 5 tabs with correct names."""
     app = build_app()
 
     # Find the Tabs component
@@ -23,8 +23,9 @@ def test_app_has_four_tabs():
     assert "🎤 Pronunciation" in tab_names
     assert "📚 Vocabulary" in tab_names
     assert "🗣️ Accent Analysis" in tab_names
+    assert "🔤 Phoneme Drills" in tab_names
     assert "💬 Voice Practice" in tab_names
-    assert len(tab_names) == 4
+    assert len(tab_names) == 5
 
 
 def test_add_flashcard_returns_tuple():

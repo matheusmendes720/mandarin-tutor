@@ -5,11 +5,13 @@ from src.lingua.pronunciation.whisper_scoring import WhisperPhonemeScorer
 from src.lingua.vocab.scheduler import Card, ReviewQuality, fsrs_schedule, create_card, get_due_cards
 from src.lingua.vocab.store import JsonStore
 from src.lingua.voice_agent.session import build_tutor_prompt, VoiceAgentConfig, Message, ConversationRole
+from src.lingua.phoneme_drill.drill import PhonemeDrill
 
 _store = JsonStore()
 _active_cards: list[Card] = []
 _review_queue: list[Card] = []
 _whisper_scorer = WhisperPhonemeScorer()
+_phoneme_drill = PhonemeDrill()
 
 
 def _load_cards() -> None:
@@ -107,6 +109,61 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                 accent_audio = gr.Audio(sources=["microphone"], type="filepath", label="Speak to analyze accent")
                 accent_btn = gr.Button("Analyze Accent")
                 accent_output = gr.JSON(label="Accent Result")
+
+            with gr.TabItem("🔤 Phoneme Drills"):
+                gr.Markdown("### Chinese Pinyin Audio Drills")
+                gr.Markdown("Practice Mandarin tones and phoneme combinations.")
+                with gr.Row():
+                    with gr.Column():
+                        initial_dropdown = gr.Dropdown(
+                            choices=_phoneme_drill.list_initials(),
+                            label="Initial (声母)",
+                            value="ma"
+                        )
+                        final_dropdown = gr.Dropdown(
+                            choices=_phoneme_drill.list_finals(),
+                            label="Final (韵母)",
+                            value="a"
+                        )
+                        tone_slider = gr.Slider(
+                            minimum=1,
+                            maximum=5,
+                            step=1,
+                            value=1,
+                            label="Tone (声调)",
+                            interactive=True
+                        )
+                        tone_display = gr.Textbox(
+                            value="Tone 1",
+                            label="Selected Tone",
+                            interactive=False
+                        )
+                        play_btn = gr.Button("🔊 Play Audio", variant="primary")
+                    with gr.Column():
+                        phoneme_output = gr.Audio(label="Phoneme Audio")
+                        tone_output = gr.Audio(label="Tone Audio")
+                        combined_output = gr.Audio(label="Combined Audio")
+
+                def update_tone_display(tone: int) -> str:
+                    tone_names = {1: "Tone 1 - 阴平 (high)", 2: "Tone 2 - 阳平 (rising)", 3: "Tone 3 - 上声 (dipping)", 4: "Tone 4 - 去声 (falling)", 5: "Tone 5 - 轻声 (neutral)"}
+                    return tone_names.get(tone, f"Tone {tone}")
+
+                def play_phoneme_audio(initial: str, final: str) -> tuple:
+                    """Play the phoneme audio (initial + final)."""
+                    phoneme = initial if initial else final
+                    paths = _phoneme_drill.play_phoneme(phoneme)
+                    if paths and len(paths) > 0:
+                        return str(paths[0])
+                    return None
+
+                def play_tone_audio(tone: int) -> str:
+                    """Play the tone audio."""
+                    path = _phoneme_drill.play_tone(tone)
+                    return str(path) if path else None
+
+                tone_slider.change(fn=update_tone_display, inputs=[tone_slider], outputs=[tone_display])
+                play_btn.click(fn=play_phoneme_audio, inputs=[initial_dropdown, final_dropdown], outputs=[phoneme_output])
+                play_btn.click(fn=play_tone_audio, inputs=[tone_slider], outputs=[tone_output])
 
             with gr.TabItem("💬 Voice Practice"):
                 gr.Markdown("Connect to voice tutor for conversational practice.")
