@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinyin — Guia de Treino Auditivo</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,sans-serif;max-width:980px;margin:24px auto;padding:0 16px;color:#222;line-height:1.5}
+  h1{font-size:28px;margin:0 0 4px}
+  h2{margin-top:32px;border-bottom:2px solid #eee;padding-bottom:6px}
+  h3{color:#555;font-size:14px;text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px}
+  .tip{background:#fff7e6;border-left:4px solid #f5a623;padding:10px 14px;border-radius:6px;margin:12px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+  .cell{background:#fafafa;border:1px solid #e5e5e5;border-radius:8px;padding:10px 8px;text-align:center;cursor:pointer;transition:all .15s}
+  .cell:hover{background:#eef6ff;border-color:#7aaee5;transform:translateY(-1px)}
+  .cell .pinyin{font-size:22px;font-weight:600;color:#1a1a1a}
+  .cell .label{font-size:11px;color:#888;margin-top:2px}
+  .pair{background:#f0f7ff;border:1px solid #b8d4f0}
+  audio{display:none}
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0;position:sticky;top:0;background:#fff;padding:8px 0;z-index:10}
+  .nav a{font-size:13px;color:#0066cc;text-decoration:none;padding:4px 10px;border-radius:4px;background:#f0f0f0}
+  .nav a:hover{background:#0066cc;color:#fff}
+  .sequencia{background:#222;color:#fff;padding:14px;border-radius:8px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:12px}
+  .sequencia button{background:#f5a623;color:#222;border:0;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600}
+  .sequencia button:hover{background:#ffc04d}
+  .dica{font-size:12px;color:#666;margin-top:6px}
+  .grupo-titulo{background:#1a1a1a;color:#fff;padding:4px 10px;border-radius:4px;font-size:12px;display:inline-block;margin-top:12px}
+</style>
+</head>
+<body>
+
+<h1>🎧 Pinyin — Treino Auditivo</h1>
+<p>68 áudios · voz masculina · clique em cada bloco pra ouvir</p>
+
+<div class="nav">
+  <a href="#iniciais">Iniciais</a>
+  <a href="#finais">Finais</a>
+  <a href="#tons">Tonalidades</a>
+  <a href="#minimos">Pares mínimos</a>
+  <a href="#sequencias">Sequências</a>
+</div>
+
+<div class="tip">
+  <strong>💡 Como treinar:</strong> ouve o áudio → fecha os olhos → tenta identificar a inicial/final/tom → confere. Repete 2x antes de olhar.
+</div>
+
+<h2 id="iniciais">Iniciais (声母) — 21 sons</h2>
+<p class="dica">Todas com a vogal "a" no 1º tom pra isolar a consoante. Foco em diferenciar <strong>zh/ch/sh</strong> de <strong>z/c/s</strong>, e <strong>n/l</strong>, <strong>f/h</strong>.</p>
+
+<h3>Grupo 1: oclusivas e nasais</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/iniciais/ba.wav')"><div class="pinyin">bā</div><div class="label">b</div></div>
+  <div class="cell" onclick="play('audio/iniciais/pa.wav')"><div class="pinyin">pā</div><div class="label">p</div></div>
+  <div class="cell" onclick="play('audio/iniciais/ma.wav')"><div class="pinyin">mā</div><div class="label">m</div></div>
+  <div class="cell" onclick="play('audio/iniciais/fa.wav')"><div class="pinyin">fā</div><div class="label">f</div></div>
+  <div class="cell" onclick="play('audio/iniciais/da.wav')"><div class="pinyin">dā</div><div class="label">d</div></div>
+  <div class="cell" onclick="play('audio/iniciais/ta.wav')"><div class="pinyin">tā</div><div class="label">t</div></div>
+  <div class="cell" onclick="play('audio/iniciais/na.wav')"><div class="pinyin">nā</div><div class="label">n</div></div>
+  <div class="cell" onclick="play('audio/iniciais/la.wav')"><div class="pinyin">lā</div><div class="label">l</div></div>
+  <div class="cell" onclick="play('audio/iniciais/ga.wav')"><div class="pinyin">gā</div><div class="label">g</div></div>
+  <div class="cell" onclick="play('audio/iniciais/ka.wav')"><div class="pinyin">kā</div><div class="label">k</div></div>
+  <div class="cell" onclick="play('audio/iniciais/ha.wav')"><div class="pinyin">hā</div><div class="label">h</div></div>
+</div>
+
+<h3>Grupo 2: sibilantes e palatais (mais difíceis)</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/iniciais/za.wav')"><div class="pinyin">zā</div><div class="label">z</div></div>
+  <div class="cell" onclick="play('audio/iniciais/ca.wav')"><div class="pinyin">cā</div><div class="label">c</div></div>
+  <div class="cell" onclick="play('audio/iniciais/sa.wav')"><div class="pinyin">sā</div><div class="label">s</div></div>
+  <div class="cell" onclick="play('audio/iniciais/zha.wav')"><div class="pinyin">zhā</div><div class="label">zh</div></div>
+  <div class="cell" onclick="play('audio/iniciais/cha.wav')"><div class="pinyin">chā</div><div class="label">ch</div></div>
+  <div class="cell" onclick="play('audio/iniciais/sha.wav')"><div class="pinyin">shā</div><div class="label">sh</div></div>
+  <div class="cell" onclick="play('audio/iniciais/ra.wav')"><div class="pinyin">rā</div><div class="label">r</div></div>
+  <div class="cell" onclick="play('audio/iniciais/jia.wav')"><div class="pinyin">jiā</div><div class="label">j</div></div>
+  <div class="cell" onclick="play('audio/iniciais/qia.wav')"><div class="pinyin">qiā</div><div class="label">q</div></div>
+  <div class="cell" onclick="play('audio/iniciais/xia.wav')"><div class="pinyin">xiā</div><div class="label">x</div></div>
+</div>
+
+<h2 id="finais">Finais (韵母) — grupos</h2>
+
+<h3>Simples</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/finais/a.wav')"><div class="pinyin">ā</div><div class="label">a</div></div>
+  <div class="cell" onclick="play('audio/finais/o.wav')"><div class="pinyin">ō</div><div class="label">o</div></div>
+  <div class="cell" onclick="play('audio/finais/e.wav')"><div class="pinyin">ē</div><div class="label">e</div></div>
+  <div class="cell" onclick="play('audio/finais/i.wav')"><div class="pinyin">ī</div><div class="label">i</div></div>
+  <div class="cell" onclick="play('audio/finais/u.wav')"><div class="pinyin">ū</div><div class="label">u</div></div>
+  <div class="cell" onclick="play('audio/finais/v.wav')"><div class="pinyin">ǖ</div><div class="label">ü</div></div>
+  <div class="cell" onclick="play('audio/finais/er.wav')"><div class="pinyin">ér</div><div class="label">er</div></div>
+</div>
+
+<h3>Compostos (ditongos)</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/finais/ai.wav')"><div class="pinyin">āi</div><div class="label">ai</div></div>
+  <div class="cell" onclick="play('audio/finais/ei.wav')"><div class="pinyin">ēi</div><div class="label">ei</div></div>
+  <div class="cell" onclick="play('audio/finais/ui.wav')"><div class="pinyin">wēi</div><div class="label">ui</div></div>
+  <div class="cell" onclick="play('audio/finais/ao.wav')"><div class="pinyin">āo</div><div class="label">ao</div></div>
+  <div class="cell" onclick="play('audio/finais/ou.wav')"><div class="pinyin">ōu</div><div class="label">ou</div></div>
+  <div class="cell" onclick="play('audio/finais/iu.wav')"><div class="pinyin">yōu</div><div class="label">iu</div></div>
+</div>
+
+<h3>Nasais (-n)</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/finais/an.wav')"><div class="pinyin">ān</div><div class="label">an</div></div>
+  <div class="cell" onclick="play('audio/finais/en.wav')"><div class="pinyin">ēn</div><div class="label">en</div></div>
+  <div class="cell" onclick="play('audio/finais/in.wav')"><div class="pinyin">yīn</div><div class="label">in</div></div>
+  <div class="cell" onclick="play('audio/finais/un.wav')"><div class="pinyin">wēn</div><div class="label">un</div></div>
+  <div class="cell" onclick="play('audio/finais/vn.wav')"><div class="pinyin">ūn</div><div class="label">ün</div></div>
+</div>
+
+<h3>Nasais (-ng)</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/finais/ang.wav')"><div class="pinyin">āng</div><div class="label">ang</div></div>
+  <div class="cell" onclick="play('audio/finais/eng.wav')"><div class="pinyin">ēng</div><div class="label">eng</div></div>
+  <div class="cell" onclick="play('audio/finais/ing.wav')"><div class="pinyin">yīng</div><div class="label">ing</div></div>
+  <div class="cell" onclick="play('audio/finais/ong.wav')"><div class="pinyin">wēng</div><div class="label">ong</div></div>
+</div>
+
+<h3>Com medial i-</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/finais/ia.wav')"><div class="pinyin">jiā</div><div class="label">ia</div></div>
+  <div class="cell" onclick="play('audio/finais/ie.wav')"><div class="pinyin">jiē</div><div class="label">ie</div></div>
+  <div class="cell" onclick="play('audio/finais/iao.wav')"><div class="pinyin">jiāo</div><div class="label">iao</div></div>
+  <div class="cell" onclick="play('audio/finais/iou.wav')"><div class="pinyin">jiū</div><div class="label">iu</div></div>
+  <div class="cell" onclick="play('audio/finais/ian.wav')"><div class="pinyin">jiān</div><div class="label">ian</div></div>
+  <div class="cell" onclick="play('audio/finais/iang.wav')"><div class="pinyin">jiāng</div><div class="label">iang</div></div>
+  <div class="cell" onclick="play('audio/finais/iong.wav')"><div class="pinyin">jiǒng</div><div class="label">iong</div></div>
+</div>
+
+<h3>Com medial u-</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/finais/ua.wav')"><div class="pinyin">wā</div><div class="label">ua</div></div>
+  <div class="cell" onclick="play('audio/finais/uo.wav')"><div class="pinyin">wō</div><div class="label">uo</div></div>
+  <div class="cell" onclick="play('audio/finais/uai.wav')"><div class="pinyin">wāi</div><div class="label">uai</div></div>
+  <div class="cell" onclick="play('audio/finais/uei.wav')"><div class="pinyin">wēi</div><div class="label">uei</div></div>
+  <div class="cell" onclick="play('audio/finais/uan.wav')"><div class="pinyin">wān</div><div class="label">uan</div></div>
+  <div class="cell" onclick="play('audio/finais/uang.wav')"><div class="pinyin">wāng</div><div class="label">uang</div></div>
+  <div class="cell" onclick="play('audio/finais/ueng.wav')"><div class="pinyin">wēng</div><div class="label">ueng</div></div>
+</div>
+
+<h3>Com medial ü-</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/finais/van.wav')"><div class="pinyin">juān</div><div class="label">üan</div></div>
+  <div class="cell" onclick="play('audio/finais/ve.wav')"><div class="pinyin">jué</div><div class="label">üe</div></div>
+  <div class="cell" onclick="play('audio/finais/vn_real.wav')"><div class="pinyin">ūn</div><div class="label">ün</div></div>
+</div>
+
+<h2 id="tons">Tonalidades (声调) — "ma" nos 4 tons + neutro</h2>
+<p class="dica">O 3º tom em geral aparece mais curto que o esperado (efeito de sandhi: antes de outro 3º vira 2º).</p>
+<div class="grid">
+  <div class="cell pair" onclick="play('audio/tonalidades/ma1.wav')"><div class="pinyin">mā</div><div class="label">1º · alto plano</div></div>
+  <div class="cell pair" onclick="play('audio/tonalidades/ma2.wav')"><div class="pinyin">má</div><div class="label">2º · ascendente</div></div>
+  <div class="cell pair" onclick="play('audio/tonalidades/ma3.wav')"><div class="pinyin">mǎ</div><div class="label">3º · baixo-ascendente</div></div>
+  <div class="cell pair" onclick="play('audio/tonalidades/ma4.wav')"><div class="pinyin">mà</div><div class="label">4º · descendente</div></div>
+  <div class="cell pair" onclick="play('audio/tonalidades/ma5.wav')"><div class="pinyin">ma</div><div class="label">neutro · leve</div></div>
+</div>
+
+<h2 id="minimos">Pares mínimos — foco no ouvido</h2>
+<p class="dica">Pares que diferem por UM som. Ouça e note a diferença.</p>
+<h3>Iniciais confundíveis</h3>
+<div class="grid">
+  <div class="cell" onclick="play('audio/iniciais/za.wav')"><div class="pinyin">zā</div><div class="label">z (soltar)</div></div>
+  <div class="cell" onclick="play('audio/iniciais/zha.wav')"><div class="pinyin">zhā</div><div class="label">zh (retroflexo)</div></div>
+  <div class="cell" onclick="play('audio/iniciais/sa.wav')"><div class="pinyin">sā</div><div class="label">s (sibilante)</div></div>
+  <div class="cell" onclick="play('audio/iniciais/sha.wav')"><div class="pinyin">shā</div><div class="label">sh (retroflexo)</div></div>
+  <div class="cell" onclick="play('audio/iniciais/na.wav')"><div class="pinyin">nā</div><div class="label">n (nasal)</div></div>
+  <div class="cell" onclick="play('audio/iniciais/la.wav')"><div class="pinyin">lā</div><div class="label">l (lateral)</div></div>
+  <div class="cell" onclick="play('audio/iniciais/fa.wav')"><div class="pinyin">fā</div><div class="label">f (labio)</div></div>
+  <div class="cell" onclick="play('audio/iniciais/ha.wav')"><div class="pinyin">hā</div><div class="label">h (aspirado)</div></div>
+</div>
+
+<h2 id="sequencias">Sequências contínuas</h2>
+<p class="dica">Ouça e escreva o que ouviu. Pause, volte, confira.</p>
+<div class="sequencia">
+  <div>
+    <div style="font-size:14px">📋 Iniciais Grupo 1 (b→l)</div>
+    <button onclick="play('audio/tonalidades/sequencia_iniciais.wav')">▶ Tocar</button>
+  </div>
+  <div>
+    <div style="font-size:14px">📋 Iniciais Grupo 2 (z→x)</div>
+    <button onclick="play('audio/tonalidades/sequencia_iniciais2.wav')">▶ Tocar</button>
+  </div>
+  <div>
+    <div style="font-size:14px">📋 Tons de "ma" (1→2→3→4→0)</div>
+    <button onclick="play('audio/tonalidades/sequencia_tons.wav')">▶ Tocar</button>
+  </div>
+</div>
+
+<div class="tip" style="margin-top:32px">
+  <strong>🎯 Próximos passos sugeridos:</strong>
+  <ol>
+    <li>Ouça cada áudio e repita em voz alta.</li>
+    <li>Foca 1 semana em cada par confundível (zh/z, n/l, f/h).</li>
+    <li>Quando acertar 90%+ de cabeça, parte pra sílabas em palavras reais (nǐ hǎo, wǒ ài nǐ, etc.).</li>
+  </ol>
+</div>
+
+<audio id="player" preload="auto"></audio>
+<script>
+  function play(src){
+    const p = document.getElementById('player');
+    p.src = src;
+    p.play().catch(e=>alert('Erro: '+e.message));
+  }
+</script>
+</body>
+</html>

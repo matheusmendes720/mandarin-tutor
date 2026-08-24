@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>50 Palavras-Frase — Essenciais do Dia-a-Dia</title>
+<style>
+/* ============================================
+   PALAVRAS-FRASE TRAINER - Dark/Light Theme
+   ============================================ */
+
+:root {
+  /* Dark Mode (default) */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-card: #21262d;
+  --bg-card-hover: #2d333b;
+  --border-color: #30363d;
+  --border-active: #58a6ff;
+
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-red: #f85149;
+  --accent-yellow: #d29922;
+  --accent-orange: #f0883e;
+  --accent-purple: #a371f7;
+  --accent-pink: #ff7b72;
+
+  --shadow: 0 8px 24px rgba(0,0,0,0.4);
+  --glow-blue: 0 0 20px rgba(88,166,255,0.3);
+}
+
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f0f0f0;
+  --border-color: #d0d7de;
+  --border-active: #0969da;
+
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --text-muted: #8c959f;
+
+  --accent-blue: #0969da;
+  --accent-green: #1a7f37;
+  --accent-red: #cf222e;
+  --accent-yellow: #9a6700;
+  --accent-orange: #bc4c00;
+  --accent-purple: #8250df;
+  --accent-pink: #d1242f;
+
+  --shadow: 0 8px 24px rgba(0,0,0,0.1);
+  --glow-blue: 0 0 20px rgba(9,105,218,0.2);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+}
+.theme-toggle:hover {
+  background: var(--bg-card-hover);
+  transform: scale(1.05);
+}
+
+/* Header */
+.header {
+  text-align: center;
+  padding: 40px 20px 20px;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border-bottom: 1px solid var(--border-color);
+}
+.header h1 {
+  font-size: 2.5em;
+  margin-bottom: 8px;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 1.1em;
+}
+
+/* Progress Bar */
+.progress-container {
+  max-width: 600px;
+  margin: 20px auto 0;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+.progress-bar-outer {
+  width: 100%;
+  height: 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.progress-bar-inner {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+  width: 0%;
+  transition: width 0.3s;
+}
+
+/* Navigation */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px 20px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+.nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.nav a:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+.nav a.active {
+  background: var(--accent-blue);
+  color: white;
+}
+
+/* Practice Mode Toggle */
+.practice-toggle {
+  position: fixed;
+  top: 16px;
+  right: 80px;
+  z-index: 1000;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+.practice-toggle:hover {
+  background: var(--bg-card-hover);
+}
+.practice-toggle.active {
+  background: var(--accent-purple);
+  color: white;
+  border-color: var(--accent-purple);
+}
+
+/* Section */
+.section {
+  padding: 32px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.section h2 {
+  font-size: 1.8em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section h2 .icon {
+  font-size: 1.4em;
+}
+.section .dica {
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  font-size: 0.95em;
+}
+
+/* Word Card Grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-active);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+.card.heard {
+  border-color: var(--accent-green);
+}
+
+.card-hanzi {
+  font-size: 2.5em;
+  font-weight: bold;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  font-family: 'KaiTi', 'STKaiti', 'Kaiti SC', serif;
+  letter-spacing: 4px;
+  transition: opacity 0.3s;
+}
+.practice-mode .card-hanzi {
+  opacity: 0.15;
+  filter: blur(8px);
+  user-select: none;
+}
+.practice-mode .card.heard .card-hanzi {
+  opacity: 1;
+  filter: none;
+}
+
+.card-pinyin {
+  text-align: center;
+  color: var(--accent-blue);
+  font-size: 1.1em;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.card-translation {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.95em;
+  margin-bottom: 12px;
+}
+
+.card-context {
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--accent-yellow);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.card-context strong {
+  color: var(--text-primary);
+}
+
+.card-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.play-btn {
+  flex: 1;
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.play-btn:hover {
+  background: #4a92e6;
+  transform: scale(1.02);
+}
+.play-btn.playing {
+  background: var(--accent-orange);
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.speed-btn {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.speed-btn:hover {
+  background: var(--bg-card-hover);
+}
+.speed-btn.active {
+  background: var(--accent-blue);
+  color: white;
+  border-color: var(--accent-blue);
+}
+
+.card-audio {
+  display: none;
+}
+
+/* Tone badge */
+.tone-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: bold;
+  margin-left: 4px;
+  color: white;
+}
+.tone-1 { background: var(--accent-blue); }
+.tone-2 { background: var(--accent-green); }
+.tone-3 { background: var(--accent-yellow); color: #000; }
+.tone-4 { background: var(--accent-red); }
+.tone-5 { background: var(--text-muted); }
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  border-top: 1px solid var(--border-color);
+  margin-top: 60px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .header h1 { font-size: 1.8em; }
+  .grid { grid-template-columns: 1fr; }
+  .nav { font-size: 0.85em; }
+  .practice-toggle { right: 70px; font-size: 12px; }
+}
+
+/* Print */
+@media print {
+  .theme-toggle, .practice-toggle, .play-btn, .speed-btn, .nav { display: none; }
+  .card { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<!-- Theme Toggle -->
+<button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+  <span id="theme-icon">🌙</span>
+</button>
+
+<!-- Practice Mode Toggle -->
+<button class="practice-toggle" id="practiceBtn" onclick="togglePractice()" title="Esconde hanzi, mostra só pinyin">
+  🎯 Modo Prática
+</button>
+
+<div class="header">
+  <h1>🗣️ 50 Palavras-Frase Essenciais</h1>
+  <p class="subtitle">Fase 1 — Vocabulário do dia-a-dia · clique ▶ pra ouvir · repita em voz alta</p>
+
+  <div class="progress-container">
+    <div class="progress-label">
+      <span>Progresso de escuta</span>
+      <span id="progressText">0 / 50</span>
+    </div>
+    <div class="progress-bar-outer">
+      <div class="progress-bar-inner" id="progressBar"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Navigation -->
+<nav class="nav" id="nav">
+  <a href="#saudacoes">👋 Saudações</a>
+  <a href="#despedidas">🚪 Despedidas</a>
+  <a href="#cortesia">🙏 Cortesia</a>
+  <a href="#pronomes">👤 Pronomes</a>
+  <a href="#respostas">✅ Respostas</a>
+  <a href="#verbos">🏃 Verbos</a>
+  <a href="#comida">🍜 Comida</a>
+  <a href="#direcoes">📍 Direções</a>
+  <a href="#tempo">⏰ Tempo</a>
+  <a href="#sentimentos">💭 Sentimentos</a>
+  <a href="#conectores">🔗 Conectores</a>
+</nav>
+
+<!-- Main Content -->
+<main id="content"></main>
+
+<div class="footer">
+  <p><strong>Dica de treino:</strong> 10 min/dia, ouve 5 palavras, repete em voz alta, usa em uma frase.</p>
+  <p style="margin-top:8px;">Voz: chinesa masculina padrão · velocidade: 0.9x · formato: MP3</p>
+</div>
+
+<script>
+/* ============================================
+   DATA — 50 palavras-frase essenciais
+   ============================================ */
+
+const words = [
+  // 1. Saudações (5)
+  { hanzi: "你好", pinyin: "nǐ hǎo", slug: "nihao", tones: [3,3], pt: "olá", context: "Cumprimento universal — funciona em qualquer situação.", cat: "saudacoes" },
+  { hanzi: "你好吗", pinyin: "nǐ hǎo ma", slug: "nihaoma", tones: [3,3,0], pt: "como vai?", context: "Pergunta clássica de cortesia. Resposta: 我很好 (wǒ hěn hǎo).", cat: "saudacoes" },
+  { hanzi: "我很好", pinyin: "wǒ hěn hǎo", slug: "wohenhao", tones: [3,3,3], pt: "estou bem", context: "Resposta padrão a 你好吗. Atenção ao sandhi: soa 'wó hén hǎo'.", cat: "saudacoes" },
+  { hanzi: "早上好", pinyin: "zǎoshang hǎo", slug: "zaoshanghao", tones: [3,1,3], pt: "bom dia", context: "Mais formal que 早 (zǎo). Use até ~11h da manhã.", cat: "saudacoes" },
+  { hanzi: "晚上好", pinyin: "wǎnshang hǎo", slug: "wanshanghao", tones: [3,1,3], pt: "boa noite", context: "Cumprimento noturno. Pra dormir, use 晚安 (wǎn'ān).", cat: "saudacoes" },
+
+  // 2. Despedidas (4)
+  { hanzi: "再见", pinyin: "zàijiàn", slug: "zaijian", tones: [4,4], pt: "tchau", context: "A despedida mais comum. Literal: 'de novo ver' = até a próxima.", cat: "despedidas" },
+  { hanzi: "明天见", pinyin: "míngtiān jiàn", slug: "mingtianjian", tones: [2,1,4], pt: "até amanhã", context: "Perfeito pra fechar o dia de trabalho ou aula.", cat: "despedidas" },
+  { hanzi: "拜拜", pinyin: "bàibài", slug: "baibai", tones: [4,4], pt: "bye (informal)", context: "Empréstimo do inglês 'bye-bye'. Use com amigos, crianças.", cat: "despedidas" },
+  { hanzi: "晚安", pinyin: "wǎn'ān", slug: "wanan", tones: [3,1], pt: "boa noite (dormir)", context: "Só use ao FINAL do dia, antes de dormir. Não é cumprimento.", cat: "despedidas" },
+
+  // 3. Cortesia (5)
+  { hanzi: "谢谢", pinyin: "xièxie", slug: "xiexie", tones: [4,4], pt: "obrigado", context: "Agradecimento universal. Informal: 谢了 (xiè le).", cat: "cortesia" },
+  { hanzi: "不客气", pinyin: "bú kèqi", slug: "bukeqi", tones: [2,4,0], pt: "de nada", context: "Resposta a 谢谢. Literal: 'não seja educado'.", cat: "cortesia" },
+  { hanzi: "对不起", pinyin: "duìbuqǐ", slug: "duibuqi", tones: [4,4,3], pt: "desculpa", context: "Pedir perdão real. Pra desculpa leve use 不好意思 (bù hǎoyìsi).", cat: "cortesia" },
+  { hanzi: "没关系", pinyin: "méi guānxi", slug: "meiguanxi", tones: [2,1,1], pt: "sem problema", context: "Resposta a 对不起. Literal: 'não há relação'.", cat: "cortesia" },
+  { hanzi: "请", pinyin: "qǐng", slug: "qing", tones: [3], pt: "por favor", context: "Sempre antes de um pedido: 请坐 (sente-se), 请进 (entre).", cat: "cortesia" },
+
+  // 4. Pronomes (4)
+  { hanzi: "我", pinyin: "wǒ", slug: "wo", tones: [3], pt: "eu", context: "Pronome pessoal de 1ª pessoa. Também possesivo: 我的 (wǒ de).", cat: "pronomes" },
+  { hanzi: "你", pinyin: "nǐ", slug: "ni", tones: [3], pt: "você", context: "2ª pessoa singular. Forma educada: 您 (nín).", cat: "pronomes" },
+  { hanzi: "他", pinyin: "tā", slug: "ta", tones: [1], pt: "ele", context: "3ª pessoa masculina. Ela = 她. Isso = 它. Mesmo som 'tā'!", cat: "pronomes" },
+  { hanzi: "我们", pinyin: "wǒmen", slug: "women", tones: [3,0], pt: "nós", context: "Plural de 我. O '们' (men) marca plural — mesmo com vários.", cat: "pronomes" },
+
+  // 5. Respostas básicas (6)
+  { hanzi: "是", pinyin: "shì", slug: "shi", tones: [4], pt: "sim (é)", context: "Resposta a perguntas sim/não. Cuidado: 'sì' (4) é outra palavra!", cat: "respostas" },
+  { hanzi: "不是", pinyin: "bú shì", slug: "bushi", tones: [2,4], pt: "não (não é)", context: "Negação de 是. 'Não é' funciona pra corrigir qualquer coisa.", cat: "respostas" },
+  { hanzi: "有", pinyin: "yǒu", slug: "you", tones: [3], pt: "ter / existe", context: "Verbo 'ter'. Negação: 没有 (méiyǒu). Funciona pra existência também.", cat: "respostas" },
+  { hanzi: "没有", pinyin: "méiyǒu", slug: "meiyou", tones: [2,3], pt: "não ter / não há", context: "Negação de 有. Use também como 'ainda não': 还没 (hái méi).", cat: "respostas" },
+  { hanzi: "好", pinyin: "hǎo", slug: "hao", tones: [3], pt: "bom / ok", context: "Uma das palavras mais versáteis. 好啊! = 'beleza!' (animado).", cat: "respostas" },
+  { hanzi: "不好", pinyin: "bù hǎo", slug: "buhao", tones: [4,3], pt: "ruim / não ok", context: "Negação de 好. 不好吃 = 'não é gostoso'.", cat: "respostas" },
+
+  // 6. Verbos do dia (5)
+  { hanzi: "去", pinyin: "qù", slug: "qu", tones: [4], pt: "ir", context: "Oposto de 来 (lái). 去哪儿? = 'pra onde vai?'", cat: "verbos" },
+  { hanzi: "来", pinyin: "lái", slug: "lai", tones: [2], pt: "vir", context: "Oposto de 去. 过来 (guò lái) = 'vem cá'.", cat: "verbos" },
+  { hanzi: "吃", pinyin: "chī", slug: "chi", tones: [1], pt: "comer", context: "吃饭 (chī fàn) = comer. 吃 + comida = 'comer X'.", cat: "verbos" },
+  { hanzi: "喝", pinyin: "hē", slug: "he", tones: [1], pt: "beber", context: "喝水 (hē shuǐ) = beber água. 喝茶 (hē chá) = tomar chá.", cat: "verbos" },
+  { hanzi: "看", pinyin: "kàn", slug: "kan", tones: [4], pt: "ver / olhar", context: "Versátil: 看电视 (TV), 看书 (livro), 看病 (médico).", cat: "verbos" },
+
+  // 7. Comida e restaurante (4)
+  { hanzi: "饭", pinyin: "fàn", slug: "fan", tones: [4], pt: "comida / arroz", context: "吃饭 = comer (refeição). 米饭 = arroz cozido.", cat: "comida" },
+  { hanzi: "水", pinyin: "shuǐ", slug: "shui", tones: [3], pt: "água", context: "喝水 = beber água. 热水 = água quente, 冷水 = fria.", cat: "comida" },
+  { hanzi: "好吃", pinyin: "hǎochī", slug: "haochi", tones: [3,1], pt: "gostoso", context: "O mais comum elogio. 很好吃! = 'tá muito bom!'", cat: "comida" },
+  { hanzi: "买单", pinyin: "mǎidān", slug: "maidan", tones: [3,1], pt: "pedir a conta", context: "Literal: 'comprar a lista'. Use no restaurante: 服务员, 买单!", cat: "comida" },
+
+  // 8. Direções (4)
+  { hanzi: "这", pinyin: "zhè", slug: "zhe", tones: [4], pt: "isto / aqui", context: "Demonstrativo de perto. 这个 (zhège) = 'este'. 哪儿? = 'onde?'", cat: "direcoes" },
+  { hanzi: "那", pinyin: "nà", slug: "na", tones: [4], pt: "aquilo / ali", context: "Demonstrativo de longe. Oposto de 这. 那么 (nàme) = 'então'.", cat: "direcoes" },
+  { hanzi: "在", pinyin: "zài", slug: "zai", tones: [4], pt: "estar em / aqui", context: "Verbo de localização. 我在北京 = 'tô em Pequim'.", cat: "direcoes" },
+  { hanzi: "哪里", pinyin: "nǎlǐ", slug: "nali", tones: [3,0], pt: "onde", context: "Pergunta de lugar. Você é de 哪里? = 'de onde você é?'", cat: "direcoes" },
+
+  // 9. Tempo (4)
+  { hanzi: "今天", pinyin: "jīntiān", slug: "jintian", tones: [1,1], pt: "hoje", context: "Literal: 'este dia'. 今天星期几? = 'que dia é hoje?'", cat: "tempo" },
+  { hanzi: "明天", pinyin: "míngtiān", slug: "mingtian", tones: [2,1], pt: "amanhã", context: "Literal: 'dia brilhante'. 明天见! = 'até amanhã!'", cat: "tempo" },
+  { hanzi: "昨天", pinyin: "zuótiān", slug: "zuotian", tones: [2,1], pt: "ontem", context: "Literal: 'dia passado'. 昨天怎么样? = 'como foi ontem?'", cat: "tempo" },
+  { hanzi: "现在", pinyin: "xiànzài", slug: "xianzai", tones: [4,4], pt: "agora", context: "现在几点? = 'que horas são agora?'", cat: "tempo" },
+
+  // 10. Sentimentos (4)
+  { hanzi: "喜欢", pinyin: "xǐhuan", slug: "xihuan", tones: [3,1], pt: "gostar", context: "我喜欢... = 'eu gosto de...'. Negação: 不喜欢.", cat: "sentimentos" },
+  { hanzi: "累", pinyin: "lèi", slug: "lei", tones: [4], pt: "cansado", context: "我累了 = 'tô cansado'. 好累! = 'que cansaço!'", cat: "sentimentos" },
+  { hanzi: "高兴", pinyin: "gāoxìng", slug: "gaoxing", tones: [1,4], pt: "feliz / contente", context: "Sinônimo de 开心 (kāixīn). 我很高兴 = 'tô feliz'.", cat: "sentimentos" },
+  { hanzi: "知道", pinyin: "zhīdào", slug: "zhidao", tones: [1,4], pt: "saber", context: "Verbo cognitivo. 我知道 = 'eu sei'. Negação: 不知道.", cat: "sentimentos" },
+
+  // 11. Conectores (5)
+  { hanzi: "我也是", pinyin: "wǒ yě shì", slug: "woyeshi", tones: [3,3,4], pt: "eu também", context: "Resposta a '我也...' (eu também...). 我也是! = 'eu também sou!'", cat: "conectores" },
+  { hanzi: "你呢", pinyin: "nǐ ne", slug: "nine", tones: [3,0], pt: "e você?", context: "A pergunta mais útil do mandarim. Rebate qualquer coisa: 你呢?", cat: "conectores" },
+  { hanzi: "真的", pinyin: "zhēn de", slug: "zhende", tones: [1,0], pt: "sério? / de verdade", context: "Pergunta de surpresa. 真的? = 'sério mesmo?'", cat: "conectores" },
+  { hanzi: "明白", pinyin: "míngbai", slug: "mingbai", tones: [2,2], pt: "entendi", context: "Confirmação. 明白了吗? = 'entendeu?' Resposta: 明白了.", cat: "conectores" },
+  { hanzi: "慢慢来", pinyin: "màn man lái", slug: "manmanlai", tones: [4,4,2], pt: "vai com calma", context: "Reduplicação (慢慢) = 'devagarzinho'. Encoraja quem tá aprendendo.", cat: "conectores" }
+];
+
+/* ============================================
+   RENDER
+   ============================================ */
+
+const categories = {
+  saudacoes: { icon: "👋", name: "Saudações", subtitle: "5 palavras · abrir conversa" },
+  despedidas: { icon: "🚪", name: "Despedidas", subtitle: "4 palavras · fechar conversa" },
+  cortesia: { icon: "🙏", name: "Cortesia", subtitle: "5 palavras · polidez básica" },
+  pronomes: { icon: "👤", name: "Pronomes", subtitle: "4 palavras · eu, você, ele..." },
+  respostas: { icon: "✅", name: "Respostas", subtitle: "6 palavras · sim, não, ter..." },
+  verbos: { icon: "🏃", name: "Verbos do dia", subtitle: "5 palavras · ir, vir, comer..." },
+  comida: { icon: "🍜", name: "Comida e restaurante", subtitle: "4 palavras · prato, água, conta" },
+  direcoes: { icon: "📍", name: "Direções e lugar", subtitle: "4 palavras · aqui, ali, onde" },
+  tempo: { icon: "⏰", name: "Tempo", subtitle: "4 palavras · hoje, amanhã..." },
+  sentimentos: { icon: "💭", name: "Sentimentos", subtitle: "4 palavras · gostar, feliz..." },
+  conectores: { icon: "🔗", name: "Frases-conector", subtitle: "5 palavras · e você? eu também..." }
+};
+
+function render() {
+  const content = document.getElementById('content');
+  const heardSet = getHeardSet();
+
+  let html = '';
+  for (const [catKey, cat] of Object.entries(categories)) {
+    const items = words.filter(w => w.cat === catKey);
+    html += `
+      <section class="section" id="${catKey}">
+        <h2><span class="icon">${cat.icon}</span> ${cat.name}</h2>
+        <p class="dica">${cat.subtitle}</p>
+        <div class="grid">
+          ${items.map(w => renderCard(w, heardSet.has(w.hanzi))).join('')}
+        </div>
+      </section>
+    `;
+  }
+  content.innerHTML = html;
+
+  // Attach handlers
+  document.querySelectorAll('.play-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const hanzi = btn.dataset.hanzi;
+      const audioFile = btn.dataset.audio;
+      const speed = parseFloat(btn.dataset.speed || '1.0');
+      playWord(btn, audioFile, hanzi, speed);
+    });
+  });
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const card = btn.closest('.card');
+      card.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      card.querySelector('.play-btn').dataset.speed = btn.dataset.speed;
+    });
+  });
+
+  updateProgress();
+}
+
+function renderCard(w, heard) {
+  return `
+    <div class="card ${heard ? 'heard' : ''}" data-hanzi="${w.hanzi}">
+      <div class="card-hanzi">${w.hanzi}</div>
+      <div class="card-pinyin">${w.pinyin} ${renderTones(w.tones)}</div>
+      <div class="card-translation">${w.pt}</div>
+      <div class="card-context"><strong>Contexto:</strong> ${w.context}</div>
+      <div class="card-controls">
+        <button class="play-btn" data-hanzi="${w.hanzi}" data-audio="audio/${w.slug}.mp3">
+          ▶ Ouvir
+        </button>
+        <button class="speed-btn active" data-speed="1.0" title="Velocidade normal">1x</button>
+        <button class="speed-btn" data-speed="0.7" title="Velocidade lenta">0.7x</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderTones(tones) {
+  return tones.map(t => `<span class="tone-badge tone-${t}">${t === 0 ? '·' : t}</span>`).join('');
+}
+
+/* ============================================
+   AUDIO + PROGRESS
+   ============================================ */
+
+let currentAudio = null;
+let currentBtn = null;
+
+function playWord(btn, src, hanzi, speed) {
+  // Stop previous
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    if (currentBtn) currentBtn.classList.remove('playing');
+  }
+
+  const audio = new Audio(src);
+  audio.playbackRate = speed;
+  audio.playbackQuality = 'high';
+  currentAudio = audio;
+  currentBtn = btn;
+
+  btn.classList.add('playing');
+  btn.innerHTML = '⏸ Tocando...';
+
+  audio.addEventListener('ended', () => {
+    btn.classList.remove('playing');
+    btn.innerHTML = '▶ Ouvir';
+    markHeard(hanzi);
+  });
+
+  audio.addEventListener('error', () => {
+    btn.classList.remove('playing');
+    btn.innerHTML = '▶ Ouvir';
+    console.error('Erro ao tocar:', src);
+  });
+
+  audio.play().catch(err => {
+    console.error('Erro de play:', err);
+    btn.classList.remove('playing');
+    btn.innerHTML = '▶ Ouvir';
+  });
+}
+
+function getHeardSet() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('heardWords') || '[]'));
+  } catch { return new Set(); }
+}
+
+function markHeard(hanzi) {
+  const heard = getHeardSet();
+  heard.add(hanzi);
+  localStorage.setItem('heardWords', JSON.stringify([...heard]));
+  const card = document.querySelector(`.card[data-hanzi="${hanzi}"]`);
+  if (card) card.classList.add('heard');
+  updateProgress();
+}
+
+function updateProgress() {
+  const heard = getHeardSet();
+  const count = heard.size;
+  const total = words.length;
+  document.getElementById('progressText').textContent = `${count} / ${total}`;
+  document.getElementById('progressBar').style.width = `${(count / total) * 100}%`;
+}
+
+/* ============================================
+   THEME + PRACTICE MODE
+   ============================================ */
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme');
+  const next = current === 'light' ? 'dark' : 'light';
+  html.setAttribute('data-theme', next);
+  document.getElementById('theme-icon').textContent = next === 'light' ? '☀️' : '🌙';
+  localStorage.setItem('theme', next);
+}
+
+function togglePractice() {
+  document.body.classList.toggle('practice-mode');
+  const btn = document.getElementById('practiceBtn');
+  btn.classList.toggle('active');
+  btn.textContent = document.body.classList.contains('practice-mode')
+    ? '👁️ Mostrar tudo'
+    : '🎯 Modo Prática';
+}
+
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Smooth scroll for nav
+document.getElementById('nav').addEventListener('click', e => {
+  if (e.target.tagName === 'A') {
+    e.preventDefault();
+    const id = e.target.getAttribute('href').slice(1);
+    scrollToSection(id);
+  }
+});
+
+// Highlight active nav item
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    const id = entry.target.id;
+    const link = document.querySelector(`.nav a[href="#${id}"]`);
+    if (link) {
+      if (entry.isIntersecting) link.classList.add('active');
+      else link.classList.remove('active');
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px' });
+
+// Init
+(function init() {
+  // Theme
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  document.getElementById('theme-icon').textContent = savedTheme === 'light' ? '☀️' : '🌙';
+
+  // Render + observe
+  render();
+  document.querySelectorAll('.section').forEach(s => observer.observe(s));
+})();
+</script>
+</body>
+</html>
