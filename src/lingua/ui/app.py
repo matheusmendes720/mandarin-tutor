@@ -2,10 +2,25 @@
 import gradio as gr
 from src.lingua.pronunciation.scorer import compute_phoneme_score, align_phonemes
 from src.lingua.vocab.scheduler import Card, ReviewQuality, fsrs_schedule, create_card, get_due_cards
+from src.lingua.vocab.store import JsonStore
 from src.lingua.voice_agent.session import build_tutor_prompt, VoiceAgentConfig, Message, ConversationRole
 
+_store = JsonStore()
 _active_cards: list[Card] = []
 _review_queue: list[Card] = []
+
+
+def _load_cards() -> None:
+    """Load cards from persistent store on startup."""
+    global _active_cards
+    loaded = _store.load()
+    _active_cards.clear()
+    _active_cards.extend(loaded)
+    _review_queue.clear()
+    _review_queue.extend(get_due_cards(_active_cards))
+
+
+_load_cards()
 
 
 def score_pronunciation(audio, text: str) -> str:
@@ -19,6 +34,7 @@ def add_flashcard(front: str, back: str) -> tuple[list[str], list[str]]:
     card = create_card(id=str(len(_active_cards) + 1), front=front, back=back)
     _active_cards.append(card)
     _review_queue.extend(get_due_cards([card]))
+    _store.save(_active_cards)
     labels = [f"{c.front} → {c.back}" for c in _active_cards]
     queue_labels = [f"{c.front} (due)" for c in _review_queue]
     return labels, queue_labels
@@ -35,6 +51,7 @@ def review_card(quality_str: str) -> str:
         if c.id == updated.id:
             _active_cards[i] = updated
     _review_queue.extend(get_due_cards([updated]))
+    _store.save(_active_cards)
     return f"Reviewed: {updated.front} → next due in {updated.interval_days} days."
 
 
