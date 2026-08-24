@@ -58,6 +58,8 @@ def test_compute_phoneme_score_identical():
     from lingua.pronunciation.scorer import compute_phoneme_score
 
     assert compute_phoneme_score(["a", "b", "c"], ["a", "b", "c"]) == 1.0
+    # Single element identical
+    assert compute_phoneme_score(["a"], ["a"]) == 1.0
 
 
 def test_compute_phoneme_score_completely_different():
@@ -66,6 +68,8 @@ def test_compute_phoneme_score_completely_different():
 
     # All substitutions = 0.0
     assert compute_phoneme_score(["a", "b"], ["x", "y"]) == 0.0
+    # Single element completely different, same length = 0.0
+    assert compute_phoneme_score(["a"], ["b"]) == 0.0
 
 
 def test_compute_phoneme_score_partial():
@@ -90,8 +94,21 @@ def test_align_phonemes_all_match():
     from lingua.pronunciation.scorer import align_phonemes
 
     result = align_phonemes(["a", "b", "c"], ["a", "b", "c"])
-    # All match means no errors
-    assert len(result) == 0
+    # All match returns all MATCH labels
+    assert len(result) == 3
+    labels = [label for pos, label in result]
+    assert labels == ["MATCH", "MATCH", "MATCH"]
+
+
+def test_align_phonemes_returns_operation_labels():
+    """Align phonemes returns MATCH, DELETE, INSERT labels."""
+    from lingua.pronunciation.scorer import align_phonemes
+
+    result = align_phonemes(["a", "b", "c"], ["a", "b", "c"])
+    # All MATCH - should return all positions with MATCH
+    labels = [label for pos, label in result]
+    assert "MATCH" in labels
+    assert all(label in ("MATCH", "DELETE", "INSERT") for _, label in result)
 
 
 def test_align_phonemes_with_mismatches():
@@ -99,9 +116,12 @@ def test_align_phonemes_with_mismatches():
     from lingua.pronunciation.scorer import align_phonemes
 
     result = align_phonemes(["a", "b", "c"], ["a", "x", "c"])
-    # Should return indices where expected != actual
+    # Should return indices with operation labels
     positions = [pos for pos, label in result]
+    labels = [label for pos, label in result]
     assert 1 in positions
+    # At position 1, expected is 'b' but actual is 'x' - should be DELETE
+    assert "DELETE" in labels
 
 
 def test_align_phonemes_extra_expected():
@@ -109,8 +129,9 @@ def test_align_phonemes_extra_expected():
     from lingua.pronunciation.scorer import align_phonemes
 
     result = align_phonemes(["a", "b", "c"], ["a", "b"])
-    # Should mark the extra phoneme as error
-    assert len(result) == 1
+    # Should mark the extra phoneme as DELETE
+    labels = [label for pos, label in result]
+    assert "DELETE" in labels
 
 
 def test_default_phoneme_analyzer_analyze():
