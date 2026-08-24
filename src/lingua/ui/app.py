@@ -5,6 +5,7 @@ from src.lingua.pronunciation.whisper_scoring import WhisperPhonemeScorer
 from src.lingua.vocab.scheduler import Card, ReviewQuality, fsrs_schedule, create_card, get_due_cards
 from src.lingua.vocab.store import JsonStore
 from src.lingua.voice_agent.session import build_tutor_prompt, VoiceAgentConfig, Message, ConversationRole
+from src.lingua.voice_agent.agent import VoiceSession
 from src.lingua.phoneme_drill.drill import PhonemeDrill
 
 _store = JsonStore()
@@ -12,6 +13,25 @@ _active_cards: list[Card] = []
 _review_queue: list[Card] = []
 _whisper_scorer = WhisperPhonemeScorer()
 _phoneme_drill = PhonemeDrill()
+_voice_session: VoiceSession | None = None
+
+
+def _get_voice_status() -> str:
+    """Get current voice session status."""
+    global _voice_session
+    if _voice_session is None:
+        return "Not connected"
+    if _voice_session.is_connected():
+        return "Connected"
+    return "Disconnected"
+
+
+def _check_livekit_configured() -> bool:
+    """Check if LiveKit is configured."""
+    global _voice_session
+    if _voice_session is None:
+        _voice_session = VoiceSession(VoiceAgentConfig(language="zh"))
+    return _voice_session.is_configured
 
 
 def _load_cards() -> None:
@@ -67,6 +87,60 @@ def review_card(quality_str: str) -> str:
     _review_queue.extend(get_due_cards([updated]))
     _store.save(_active_cards)
     return f"Reviewed: {updated.front} → next due in {updated.interval_days} days."
+
+
+def connect_voice_session(scenario: str = "conversation") -> tuple[str, str]:
+    """Connect to voice session for practice.
+
+    Args:
+        scenario: Practice scenario (conversation, pronunciation, dialogue)
+
+    Returns:
+        Tuple of (status message, button label)
+    """
+    global _voice_session
+    try:
+        if not _check_livekit_configured():
+            return "LiveKit not configured. Set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET.", "Connect"
+        # Create session with Mandarin context
+        config = VoiceAgentConfig(
+            language="zh",
+            system_prompt=f"""你是友好的普通话教师，帮助学生练习中文。
+当前练习模式: {scenario}
+- conversation (对话): 自由对话练习
+- pronunciation (发音): 专注发音纠正
+- dialogue (对话): 特定场景对话练习
+
+请用中文回复，并根据模式提供适当的练习指导。"""
+        )
+        _voice_session = VoiceSession(config)
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(_voice_session.connect())
+        mode_text = {"conversation": "对话模式", "pronunciation": "发音模式", "dialogue": "情景对话"}
+        return f"Connected - {mode_text.get(scenario, scenario)}", "Disconnect"
+    except ImportError as e:
+        return f"Error: {e}", "Connect"
+    except RuntimeError as e:
+        return f"Error: {e}", "Connect"
+    except Exception as e:
+        return f"Connection failed: {e}", "Connect"
+
+
+def disconnect_voice_session() -> tuple[str, str]:
+    """Disconnect from voice session.
+
+    Returns:
+        Tuple of (status message, button label)
+    """
+    global _voice_session
+    try:
+        if _voice_session is not None:
+            import asyncio
+            asyncio.get_event_loop().run_until_complete(_voice_session.disconnect())
+            _voice_session = None
+        return "Disconnected", "Connect"
+    except Exception as e:
+        return f"Disconnect error: {e}", "Connect"
 
 
 def build_app(config: dict | None = None) -> gr.Blocks:
@@ -166,9 +240,45 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                 play_btn.click(fn=play_tone_audio, inputs=[tone_slider], outputs=[tone_output])
 
             with gr.TabItem("💬 Voice Practice"):
-                gr.Markdown("Connect to voice tutor for conversational practice.")
-                voice_status = gr.Textbox(label="Session Status", value="Not connected")
-                voice_connect_btn = gr.Button("Start Voice Session", variant="primary")
+                gr.Markdown("### 🇨🇳 普通话练习 - Mandarin Practice")
+                gr.Markdown("Connect to voice tutor for conversational Mandarin practice.")
+
+                with gr.Row():
+                    with gr.Column():
+                        scenario_dropdown = gr.Dropdown(
+                            choices=["conversation", "pronunciation", "dialogue"],
+                            label="Practice Mode 练习模式",
+                            value="conversation",
+                        )
+                        voice_status = gr.Textbox(
+                            label="Session Status 会话状态",
+                            value="Not connected",
+                            interactive=False
+                        )
+                        voice_connect_btn = gr.Button("Connect 连接", variant="primary")
+                    with gr.Column():
+                        voice_info = gr.Markdown("""
+**Mandarin Practice Modes:**
+- **对话 (Conversation)**: Free-talking practice
+- **发音 (Pronunciation)**: Focus on pronunciation correction
+- **情景对话 (Dialogue)**: Role-play specific scenarios
+
+*Set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET to connect.*
+                        """)
+
+                # Handle connect/disconnect toggle
+                def toggle_voice_connection(scenario: str, current_btn: str) -> tuple[str, str, str]:
+                    """Toggle voice connection on/off."""
+                    if current_btn == "Disconnect":
+                        return disconnect_voice_session()
+                    else:
+                        return connect_voice_session(scenario)
+
+                voice_connect_btn.click(
+                    fn=toggle_voice_connection,
+                    inputs=[scenario_dropdown, voice_connect_btn],
+                    outputs=[voice_status, voice_connect_btn],
+                )
 
         gr.Markdown("--- Built with Lingua Platform · AI Language Tutor ---")
     return app
