@@ -38,8 +38,10 @@ def review_card(quality_str: str) -> str:
     return f"Reviewed: {updated.front} → next due in {updated.interval_days} days."
 
 
-def build_app() -> gr.Blocks:
-    with gr.Blocks(title="Lingua") as app:
+def build_app(config: dict | None = None) -> gr.Blocks:
+    if config is None:
+        config = {}
+    with gr.Blocks(title=config.get("title", "Lingua")) as app:
         gr.Markdown("# 🌐 Lingua — Pronunciation & Vocabulary Tutor")
 
         with gr.Tabs():

@@ -75,3 +75,12 @@ class VoiceAgentConfig:
     )
     voice_model: str = "sensevoice"
     max_turns: int = 20
+
+
+# ── App Configuration ───────────────────────────────────────────────────────────
+
+@dataclass
+class AppConfig:
+    port: int = 7860
+    host: str = "0.0.0.0"
+    reload: bool = False
