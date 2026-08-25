@@ -484,12 +484,11 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                         """)
 
                 # Handle connect/disconnect toggle
-                def toggle_voice_connection(scenario: str, current_btn: str) -> tuple[str, str, str]:
+                def toggle_voice_connection(scenario: str, current_btn: str) -> tuple[str, str]:
                     """Toggle voice connection on/off."""
                     if current_btn == "Disconnect":
                         return disconnect_voice_session()
-                    else:
-                        return connect_voice_connection(scenario)
+                    return connect_voice_session(scenario)
 
                 voice_connect_btn.click(
                     fn=toggle_voice_connection,
