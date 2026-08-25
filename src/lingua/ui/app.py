@@ -278,18 +278,6 @@ def build_app(config: dict | None = None) -> gr.Blocks:
     _active_cards = _store.load()
     _review_queue = _active_cards  # review queue shares the same list reference
 
-    # Bootstrap palavras-essenciais deck if store is empty.
-    # Imported cards are due tomorrow — the user opts into review from the deck browser.
-    if not _active_cards:
-        try:
-            from datetime import datetime, timedelta
-            pe_cards = load_palavras_essenciais("palavras-essenciais/guia.html")
-            for c in pe_cards:
-                c.due_date = datetime.now() + timedelta(days=1)
-            _active_cards.extend(pe_cards)
-            _store.save(_active_cards)
-        except Exception:
-            pass  # Non-fatal — app still functions without imported deck
     app = gr.Blocks()
     with app:
         gr.Markdown("# 🌐 Lingua — Pronunciation & Vocabulary Tutor")
@@ -330,7 +318,7 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                         play_audio_btn = gr.Button("🔊 Play Audio", variant="secondary")
                         review_audio = gr.Audio(label="Audio", type="filepath")
 
-                with gr.Accordion(f"📚 palavras-essenciais deck ({len(_deck.cards_by_category())} cards)", open=False):
+                with gr.Accordion(f"📚 palavras-essenciais deck ({len(_deck.cards_by_category())} cards)", open=True):
                     _cat_choices = ["(all)"] + [c["name_pt"] for c in _deck.categories()]
                     _cat_by_label: dict[str, str | None] = {"(all)": None}
                     _cat_by_label.update({c["name_pt"]: c["key"] for c in _deck.categories()})
