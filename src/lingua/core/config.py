@@ -94,6 +94,31 @@ class DeckBrowser(Protocol):
         ...
 
 
+# ── Phoneme Catalog ──────────────────────────────────────────────────────────
+
+@dataclass
+class PhonemeCatalogConfig:
+    """Configuration for the phoneme/syllable catalog (e.g. pinyin-completo)."""
+    guia_path: str = "pinyin-completo/guia.html"
+    audio_base: str = "pinyin-completo/audio"
+
+
+class PhonemeCatalog(Protocol):
+    """Browsable phoneme/tone catalog with pedagogical metadata."""
+
+    def initials(self) -> list[dict]:
+        """Return [{key, group, name_pt, audio_path}] for each initial."""
+        ...
+
+    def finals(self) -> list[dict]:
+        """Return [{key, group, name_pt, audio_path}] for each final."""
+        ...
+
+    def tones(self) -> list[dict]:
+        """Return [{number, name_pt, name_zh, audio_path}] for the 5 tones."""
+        ...
+
+
 # ── Voice Agent ───────────────────────────────────────────────────────────────
 
 @dataclass

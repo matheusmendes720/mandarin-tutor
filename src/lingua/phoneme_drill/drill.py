@@ -194,3 +194,33 @@ class PhonemeDrill:
             Path to ma1.wav through ma5.wav
         """
         return self.play_tone(tone)
+
+    def play_phoneme_combined(
+        self, initial: str | None, final: str | None, tone: int
+    ) -> tuple[list[Path], Path | None, list[Path]] | None:
+        """Return (phoneme_paths, tone_path, combined_order).
+
+        ``phoneme_paths`` lists the audio files for the initial + final
+        (combined). ``tone_path`` is the ma{tone}.wav file, or None if the
+        tone is invalid. ``combined_order`` is the playback order
+        (initial/final then tone).
+
+        Returns None when both initial and final were provided but neither
+        resolved to an audio path. If either initial or final resolves
+        (even partially) or only a tone is requested, the 3-tuple is
+        returned with the missing parts empty/None.
+        """
+        had_phoneme_input = bool(initial or final)
+        phoneme = (initial or "") + (final or "")
+        phoneme_paths = self.play_phoneme(phoneme) if phoneme else None
+        tone_path = self.play_tone(tone)
+        # If the caller asked for a phoneme but we couldn't resolve it,
+        # treat the call as invalid — don't leak a tone-only stub.
+        if had_phoneme_input and not phoneme_paths:
+            return None
+        if not phoneme_paths and tone_path is None:
+            return None
+        ordered = list(phoneme_paths or [])
+        if tone_path is not None:
+            ordered.append(tone_path)
+        return phoneme_paths or [], tone_path, ordered
