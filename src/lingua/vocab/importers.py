@@ -51,6 +51,7 @@ def load_palavras_essenciais(path: str) -> list[Card]:
             hanzi:\s*"([^"]+)"[\s\S]*?
             pinyin:\s*"([^"]+)"[\s\S]*?
             slug:\s*"([^"]+)"[\s\S]*?
+            tones:\s*\[([^\]]*)\][\s\S]*?
             pt:\s*"([^"]+)"[\s\S]*?
             context:\s*"([^"]+)"[\s\S]*?
             cat:\s*"([^"]+)"
@@ -62,7 +63,10 @@ def load_palavras_essenciais(path: str) -> list[Card]:
     now = datetime.now()
 
     for word_match in word_pattern.finditer(js_array):
-        hanzi, pinyin, slug, pt, _context, _cat = word_match.groups()
+        hanzi, pinyin, slug, tones_raw, pt, context, cat = word_match.groups()
+
+        # Parse tones: '[3,3]' -> [3,3]; '' -> [].
+        tones = _parse_tones(tones_raw)
 
         # Generate ID from hanzi (simple hash-like approach)
         card_id = f"pe_{slug}"
@@ -79,12 +83,21 @@ def load_palavras_essenciais(path: str) -> list[Card]:
             interval_days=0,
             repetitions=0,
             due_date=now,
+            pinyin=pinyin,
+            context=context,
+            cat=cat,
+            tones=tones,
+            audio_path=audio_path,
         )
-
-        # Attach audio_path as a temporary attribute for later use
-        # (Card doesn't have audio_path field, so we attach it dynamically)
-        card.audio_path = audio_path  # type: ignore[attr-defined]
 
         cards.append(card)
 
     return cards
+
+
+def _parse_tones(raw: str) -> list[int]:
+    """Parse '[3,3]' -> [3,3]; '' -> []."""
+    raw = raw.strip()
+    if not raw:
+        return []
+    return [int(x.strip()) for x in raw.split(",") if x.strip()]

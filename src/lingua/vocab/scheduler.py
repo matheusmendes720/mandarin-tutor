@@ -21,6 +21,12 @@ class Card:
     interval_days: int = 1
     repetitions: int = 0
     due_date: datetime = field(default_factory=datetime.now)
+    # Optional rich metadata (palavras-essenciais and future decks)
+    pinyin: str | None = None
+    context: str | None = None
+    cat: str | None = None
+    tones: list[int] = field(default_factory=list)
+    audio_path: str | None = None
 
 
 def fsrs_schedule(card: Card, quality: ReviewQuality) -> Card:
@@ -35,6 +41,11 @@ def fsrs_schedule(card: Card, quality: ReviewQuality) -> Card:
             interval_days=1,
             repetitions=0,
             due_date=datetime.now() + timedelta(minutes=10),
+            pinyin=card.pinyin,
+            context=card.context,
+            cat=card.cat,
+            tones=list(card.tones),
+            audio_path=card.audio_path,
         )
     if card.repetitions == 0:
         new_interval = 1
@@ -54,6 +65,11 @@ def fsrs_schedule(card: Card, quality: ReviewQuality) -> Card:
         interval_days=new_interval,
         repetitions=card.repetitions + 1,
         due_date=datetime.now() + timedelta(days=new_interval),
+        pinyin=card.pinyin,
+        context=card.context,
+        cat=card.cat,
+        tones=list(card.tones),
+        audio_path=card.audio_path,
     )
 
 

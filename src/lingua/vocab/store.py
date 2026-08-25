@@ -32,6 +32,11 @@ def card_to_dict(card: Card) -> dict:
         "interval_days": card.interval_days,
         "repetitions": card.repetitions,
         "due_date": card.due_date,
+        "pinyin": card.pinyin,
+        "context": card.context,
+        "cat": card.cat,
+        "tones": card.tones,
+        "audio_path": card.audio_path,
     }
 
 
@@ -45,6 +50,11 @@ def dict_to_card(dct: dict) -> Card:
         interval_days=dct.get("interval_days", 1),
         repetitions=dct.get("repetitions", 0),
         due_date=dct.get("due_date", datetime.now()),
+        pinyin=dct.get("pinyin"),
+        context=dct.get("context"),
+        cat=dct.get("cat"),
+        tones=dct.get("tones", []),
+        audio_path=dct.get("audio_path"),
     )
 
 
@@ -56,7 +66,7 @@ class JsonStore:
         if path is None:
             self._path = Path.home() / ".lingua" / "cards.json"
         else:
-            self._path = path
+            self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
     def save(self, cards: list[Card]) -> None:
