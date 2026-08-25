@@ -4,16 +4,39 @@ from src.lingua.pronunciation.scorer import compute_phoneme_score, align_phoneme
 from src.lingua.pronunciation.whisper_scoring import WhisperPhonemeScorer
 from src.lingua.vocab.scheduler import Card, ReviewQuality, fsrs_schedule, create_card, get_due_cards
 from src.lingua.vocab.store import JsonStore
+from src.lingua.vocab.importers import load_palavras_essenciais
+from src.lingua.core.config import DeckConfig, PhonemeCatalogConfig
+from src.lingua.vocab.decks import PalavrasEssenciaisDeck
+from src.lingua.phoneme_drill.catalog import PinyinCompletoCatalog
 from src.lingua.voice_agent.session import build_tutor_prompt, VoiceAgentConfig, Message, ConversationRole
 from src.lingua.voice_agent.agent import VoiceSession
 from src.lingua.phoneme_drill.drill import PhonemeDrill
+from src.lingua.tts.engine import synthesize_text
+from src.lingua.accent.detector import detect_accent
 
 _store = JsonStore()
 _active_cards: list[Card] = []
 _review_queue: list[Card] = []
 _whisper_scorer = WhisperPhonemeScorer()
 _phoneme_drill = PhonemeDrill()
+_phoneme_catalog = PinyinCompletoCatalog(PhonemeCatalogConfig())
+_deck = PalavrasEssenciaisDeck(DeckConfig())
 _voice_session: VoiceSession | None = None
+_current_review_card: Card | None = None
+
+
+def _card_audio_path(card: Card) -> str | None:
+    """Derive audio path from card metadata.
+
+    Prefer the explicit ``card.audio_path`` field (set during import).
+    Fall back to the pe_<slug> convention for backwards compatibility.
+    """
+    if card.audio_path:
+        return card.audio_path
+    if card.id.startswith("pe_"):
+        slug = card.id[3:]  # strip 'pe_' prefix
+        return f"palavras-essenciais/audio/{slug}.mp3"
+    return None
 
 
 def _get_voice_status() -> str:
@@ -35,16 +58,37 @@ def _check_livekit_configured() -> bool:
 
 
 def _load_cards() -> None:
-    """Load cards from persistent store on startup."""
+    """Load cards from persistent store, importing Portuguese deck on first run."""
     global _active_cards
     loaded = _store.load()
     _active_cards.clear()
-    _active_cards.extend(loaded)
     _review_queue.clear()
+    if loaded:
+        _active_cards.extend(loaded)
+    else:
+        # First run: import the bundled Portuguese-Chinese deck
+        try:
+            from lingua.vocab.importers import load_palavras_essenciais
+            pe_path = "palavras-essenciais/guia.html"
+            imported = load_palavras_essenciais(pe_path)
+            _active_cards.extend(imported)
+            _store.save(_active_cards)
+        except Exception:
+            pass  # No bundled deck available
     _review_queue.extend(get_due_cards(_active_cards))
 
 
 _load_cards()
+
+
+def _get_card_labels() -> list[str]:
+    """Return labels for all active cards."""
+    return [f"{c.front} → {c.back}" for c in _active_cards]
+
+
+def _get_queue_labels() -> list[str]:
+    """Return labels for due cards."""
+    return [f"{c.front} (due)" for c in _review_queue]
 
 
 def score_pronunciation(audio, text: str) -> str:
@@ -64,20 +108,95 @@ def score_pronunciation(audio, text: str) -> str:
         return f"Error scoring pronunciation: {e}"
 
 
-def add_flashcard(front: str, back: str) -> tuple[list[str], list[str]]:
+def play_tts(text: str) -> str:
+    """Synthesize text to speech and return the audio file path."""
+    if not text:
+        return ""
+    try:
+        result = synthesize_text(text)
+        import tempfile, os
+        from scipy.io import wavfile
+        import numpy as np
+        # Write synthesized audio to a temp WAV file for Gradio to play
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, "lingua_tts_output.wav")
+        wav_data = np.frombuffer(result.audio_bytes, dtype=np.int16)
+        wavfile.write(temp_path, result.sample_rate, wav_data)
+        return temp_path
+    except Exception as e:
+        return f"TTS error: {e}"
+
+
+def analyze_accent(audio_path: str | None) -> str:
+    """Analyze accent from recorded audio."""
+    if audio_path is None:
+        return "Please record audio first."
+    try:
+        result = detect_accent(audio_path)
+        if "error" in result:
+            return f"Error: {result.get('error', 'Unknown error')}"
+        return (
+            f"Language: {result['language']}\n"
+            f"Dialect: {result.get('dialect', 'N/A')}\n"
+            f"Confidence: {result['confidence']:.0%}\n"
+            f"Transcription: {result.get('transcription', 'N/A')}"
+        )
+    except Exception as e:
+        return f"Accent analysis error: {e}"
+
+
+def add_flashcard(front: str, back: str) -> tuple[list[dict], list[dict]]:
     card = create_card(id=str(len(_active_cards) + 1), front=front, back=back)
     _active_cards.append(card)
     _review_queue.extend(get_due_cards([card]))
     _store.save(_active_cards)
-    labels = [f"{c.front} → {c.back}" for c in _active_cards]
-    queue_labels = [f"{c.front} (due)" for c in _review_queue]
-    return labels, queue_labels
+    return [_card_to_display_dict(c) for c in _active_cards], [_card_to_display_dict(c) for c in _review_queue]
+
+
+def _card_to_display_dict(card: Card) -> dict:
+    """Convert a Card to a display-friendly dict for gr.JSON."""
+    audio = _card_audio_path(card)
+    return {
+        "id": card.id,
+        "front": card.front,
+        "back": card.back,
+        "pinyin": card.pinyin,
+        "context": card.context,
+        "cat": card.cat,
+        "tones": card.tones,
+        "due": card.due_date.isoformat() if card.due_date else None,
+        "interval": card.interval_days,
+        "audio": "🔊" if audio else None,
+    }
+
+
+def list_deck_cards(category_key: str | None) -> list[dict]:
+    """Return deck cards filtered by category_key (None = all)."""
+    return _deck.cards_by_category(category_key)
+
+
+def list_deck_categories() -> list[dict]:
+    """Return deck category metadata."""
+    return _deck.categories()
+
+
+def play_deck_card_audio(card_id: str) -> str | None:
+    """Return audio path for a given deck card_id."""
+    return _deck.audio_path(card_id)
+
+
+def load_card_lists() -> tuple[list[dict], list[dict]]:
+    """Load card lists for gr.JSON display on app startup."""
+    return [_card_to_display_dict(c) for c in _active_cards], [_card_to_display_dict(c) for c in _review_queue]
 
 
 def review_card(quality_str: str) -> str:
     """Review a due card and return updated status."""
+    global _current_review_card
     if not _review_queue:
+        _current_review_card = None
         return "No cards due!"
+    _current_review_card = _review_queue[0]
     card = _review_queue.pop(0)
     q = ReviewQuality[quality_str.upper()]
     updated = fsrs_schedule(card, q)
@@ -87,6 +206,13 @@ def review_card(quality_str: str) -> str:
     _review_queue.extend(get_due_cards([updated]))
     _store.save(_active_cards)
     return f"Reviewed: {updated.front} → next due in {updated.interval_days} days."
+
+
+def play_card_audio() -> str | None:
+    """Return the audio file path for the current review card."""
+    if _current_review_card is None:
+        return None
+    return _card_audio_path(_current_review_card)
 
 
 def connect_voice_session(scenario: str = "conversation") -> tuple[str, str]:
@@ -144,9 +270,28 @@ def disconnect_voice_session() -> tuple[str, str]:
 
 
 def build_app(config: dict | None = None) -> gr.Blocks:
+    global _active_cards, _review_queue
     if config is None:
         config = {}
-    with gr.Blocks(title=config.get("title", "Lingua")) as app:
+
+    # Load persisted cards on startup
+    _active_cards = _store.load()
+    _review_queue = _active_cards  # review queue shares the same list reference
+
+    # Bootstrap palavras-essenciais deck if store is empty.
+    # Imported cards are due tomorrow — the user opts into review from the deck browser.
+    if not _active_cards:
+        try:
+            from datetime import datetime, timedelta
+            pe_cards = load_palavras_essenciais("palavras-essenciais/guia.html")
+            for c in pe_cards:
+                c.due_date = datetime.now() + timedelta(days=1)
+            _active_cards.extend(pe_cards)
+            _store.save(_active_cards)
+        except Exception:
+            pass  # Non-fatal — app still functions without imported deck
+    app = gr.Blocks()
+    with app:
         gr.Markdown("# 🌐 Lingua — Pronunciation & Vocabulary Tutor")
 
         with gr.Tabs():
@@ -162,27 +307,87 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                         tts_btn = gr.Button("🔊 Play TTS")
                         tts_output = gr.Audio(label="TTS Output")
                 score_btn.click(fn=score_pronunciation, inputs=[audio_input, text_input], outputs=[feedback_output])
+                tts_btn.click(fn=play_tts, inputs=[tts_text], outputs=[tts_output])
 
             with gr.TabItem("📚 Vocabulary"):
+                gr.Markdown("### Browse the palavras-essenciais deck or review due cards.")
                 with gr.Row():
                     with gr.Column():
+                        gr.Markdown("#### Add Flashcard")
                         new_front = gr.Textbox(label="Front (word/phrase)")
                         new_back = gr.Textbox(label="Back (translation/meaning)")
                         add_btn = gr.Button("Add Flashcard", variant="primary")
-                        card_list = gr.List(label="All Cards")
-                        queue_list = gr.List(label="Due for Review")
+                        card_list = gr.JSON(label="All Cards")
+                        queue_list = gr.JSON(label="Due for Review")
                     with gr.Column():
-                        gr.Markdown("### Review")
-                        review_quality = gr.Radio(choices=["again", "hard", "good", "easy"], label="How well did you remember?")
+                        gr.Markdown("#### Review")
+                        review_quality = gr.Radio(
+                            choices=["again", "hard", "good", "easy"],
+                            label="How well did you remember?",
+                        )
                         review_btn = gr.Button("Submit Review")
                         review_status = gr.Textbox(label="Status", lines=2)
+                        play_audio_btn = gr.Button("🔊 Play Audio", variant="secondary")
+                        review_audio = gr.Audio(label="Audio", type="filepath")
+
+                with gr.Accordion(f"📚 palavras-essenciais deck ({len(_deck.cards_by_category())} cards)", open=False):
+                    _cat_choices = ["(all)"] + [c["name_pt"] for c in _deck.categories()]
+                    _cat_by_label: dict[str, str | None] = {"(all)": None}
+                    _cat_by_label.update({c["name_pt"]: c["key"] for c in _deck.categories()})
+                    category_dropdown = gr.Dropdown(
+                        choices=_cat_choices,
+                        value="(all)",
+                        label="Filter by category",
+                    )
+                    deck_card_audio = gr.Audio(label="Selected card audio", type="filepath")
+                    deck_list = gr.JSON(label="Cards in selected category")
+                    with gr.Row():
+                        prev_card_btn = gr.Button("⬅ Previous")
+                        next_card_btn = gr.Button("Next ➡")
+                    deck_index = gr.State(value=0)
+
+                    def _on_category_change(label: str) -> tuple[list[dict], int]:
+                        key = _cat_by_label.get(label)
+                        return list_deck_cards(key), 0
+
+                    def _navigate(label: str, index: int, direction: int) -> tuple[str | None, int]:
+                        key = _cat_by_label.get(label)
+                        cards = list_deck_cards(key)
+                        if not cards:
+                            return None, 0
+                        new_index = (index + direction) % len(cards)
+                        return play_deck_card_audio(cards[new_index]["id"]), new_index
+
+                    category_dropdown.change(
+                        fn=_on_category_change,
+                        inputs=[category_dropdown],
+                        outputs=[deck_list, deck_index],
+                    )
+                    prev_card_btn.click(
+                        fn=lambda label, idx: _navigate(label, idx, -1),
+                        inputs=[category_dropdown, deck_index],
+                        outputs=[deck_card_audio, deck_index],
+                    )
+                    next_card_btn.click(
+                        fn=lambda label, idx: _navigate(label, idx, +1),
+                        inputs=[category_dropdown, deck_index],
+                        outputs=[deck_card_audio, deck_index],
+                    )
+
                 add_btn.click(fn=add_flashcard, inputs=[new_front, new_back], outputs=[card_list, queue_list])
                 review_btn.click(fn=review_card, inputs=[review_quality], outputs=[review_status])
+                play_audio_btn.click(fn=play_card_audio, outputs=[review_audio])
+                app.load(fn=load_card_lists, outputs=[card_list, queue_list])
+                app.load(
+                    fn=lambda: list_deck_cards(None),
+                    outputs=[deck_list],
+                )
 
             with gr.TabItem("🗣️ Accent Analysis"):
                 accent_audio = gr.Audio(sources=["microphone"], type="filepath", label="Speak to analyze accent")
-                accent_btn = gr.Button("Analyze Accent")
-                accent_output = gr.JSON(label="Accent Result")
+                accent_btn = gr.Button("Analyze Accent", variant="primary")
+                accent_output = gr.Textbox(label="Accent Result", lines=5)
+                accent_btn.click(fn=analyze_accent, inputs=[accent_audio], outputs=[accent_output])
 
             with gr.TabItem("🔤 Phoneme Drills"):
                 gr.Markdown("### Chinese Pinyin Audio Drills")
@@ -222,22 +427,22 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                     tone_names = {1: "Tone 1 - 阴平 (high)", 2: "Tone 2 - 阳平 (rising)", 3: "Tone 3 - 上声 (dipping)", 4: "Tone 4 - 去声 (falling)", 5: "Tone 5 - 轻声 (neutral)"}
                     return tone_names.get(tone, f"Tone {tone}")
 
-                def play_phoneme_audio(initial: str, final: str) -> tuple:
-                    """Play the phoneme audio (initial + final)."""
+                def play_phoneme_audio(initial: str, final: str, tone: int) -> tuple[str | None, str | None, str | None]:
+                    """Play phoneme + tone audio, returning paths for all three outputs."""
                     phoneme = initial if initial else final
                     paths = _phoneme_drill.play_phoneme(phoneme)
-                    if paths and len(paths) > 0:
-                        return str(paths[0])
-                    return None
-
-                def play_tone_audio(tone: int) -> str:
-                    """Play the tone audio."""
-                    path = _phoneme_drill.play_tone(tone)
-                    return str(path) if path else None
+                    tone_path = _phoneme_drill.play_tone(tone)
+                    phoneme_str = str(paths[0]) if paths and len(paths) > 0 else None
+                    tone_str = str(tone_path) if tone_path else None
+                    # Combined: phoneme path used for combined audio display
+                    return phoneme_str, tone_str, phoneme_str
 
                 tone_slider.change(fn=update_tone_display, inputs=[tone_slider], outputs=[tone_display])
-                play_btn.click(fn=play_phoneme_audio, inputs=[initial_dropdown, final_dropdown], outputs=[phoneme_output])
-                play_btn.click(fn=play_tone_audio, inputs=[tone_slider], outputs=[tone_output])
+                play_btn.click(
+                    fn=play_phoneme_audio,
+                    inputs=[initial_dropdown, final_dropdown, tone_slider],
+                    outputs=[phoneme_output, tone_output, combined_output],
+                )
 
             with gr.TabItem("💬 Voice Practice"):
                 gr.Markdown("### 🇨🇳 普通话练习 - Mandarin Practice")
@@ -272,7 +477,7 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                     if current_btn == "Disconnect":
                         return disconnect_voice_session()
                     else:
-                        return connect_voice_session(scenario)
+                        return connect_voice_connection(scenario)
 
                 voice_connect_btn.click(
                     fn=toggle_voice_connection,
