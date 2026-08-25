@@ -63,6 +63,37 @@ class VocabConfig:
     max_reviews_per_day: int = 200
 
 
+# ── Deck Sources ──────────────────────────────────────────────────────────────
+
+@dataclass
+class DeckConfig:
+    """Configuration for an external deck source (e.g. palavras-essenciais)."""
+    deck_path: str = "palavras-essenciais/guia.html"
+    audio_base: str = "palavras-essenciais/audio"
+    deck_id: str = "palavras-essenciais"
+
+
+class DeckBrowser(Protocol):
+    """Browsable vocabulary/phrase deck with rich metadata."""
+
+    def categories(self) -> list[dict]:
+        """Return [{key, icon, name_pt, subtitle, count}] for all categories."""
+        ...
+
+    def cards_by_category(self, category_key: str | None = None) -> list[dict]:
+        """Return all cards, or filtered by category. Each dict has
+        {id, hanzi, pinyin, pt, context, tones, audio_path, cat}."""
+        ...
+
+    def card(self, card_id: str) -> dict | None:
+        """Return one card by id, or None."""
+        ...
+
+    def audio_path(self, card_id: str) -> str | None:
+        """Return path to the audio file for this card, or None."""
+        ...
+
+
 # ── Voice Agent ───────────────────────────────────────────────────────────────
 
 @dataclass
