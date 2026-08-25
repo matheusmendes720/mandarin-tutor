@@ -97,14 +97,14 @@ class PinyinCompletoCatalog:
             ("Finais", "final", self._final_groups),
         ]:
             section_re = re.compile(
-                rf"{label}(.+?)(?=Iniciais|Finais|Tons|Tonalidades|$)",
+                rf'<h2[^>]*id="{label.lower()}"[^>]*>(.+?)(?=<h2|$)',
                 re.DOTALL | re.IGNORECASE,
             )
             sec = section_re.search(text)
             if not sec:
                 continue
             section = sec.group(1)
-            for stem in re.findall(r"[\"'](\w+)[\"']\.wav", section):
+            for stem in re.findall(r"[\"']?(\w+)[\"']?\.wav", section):
                 order = self._initial_order if target == "initial" else self._final_order
                 if stem not in order:
                     order.append(stem)
@@ -117,5 +117,5 @@ class PinyinCompletoCatalog:
                 )
                 if gm:
                     current_group = gm.group(0)
-                for stem in re.findall(r"[\"'](\w+)[\"']\.wav", chunk):
+                for stem in re.findall(r"[\"']?(\w+)[\"']?\.wav", chunk):
                     groups.setdefault(stem, current_group)

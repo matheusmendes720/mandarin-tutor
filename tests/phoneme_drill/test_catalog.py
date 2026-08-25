@@ -23,6 +23,8 @@ def test_initials_returns_each_with_group(catalog):
     assert len(initials) == 21
     for entry in initials:
         assert {"key", "group", "name_pt", "audio_path"} <= set(entry.keys())
+    assert any(entry["group"] != "Outros" for entry in initials), \
+        "initials lost their parsed group — catalog regex regressed?"
 
 
 def test_finals_returns_each_with_group(catalog):
@@ -30,6 +32,8 @@ def test_finals_returns_each_with_group(catalog):
     assert len(finals) == 39
     for entry in finals:
         assert {"key", "group", "name_pt", "audio_path"} <= set(entry.keys())
+    assert any(entry["group"] != "Outros" for entry in finals), \
+        "finals lost their parsed group — catalog regex regressed?"
 
 
 def test_tones_returns_five(catalog):
