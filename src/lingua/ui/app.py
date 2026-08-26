@@ -58,23 +58,17 @@ def _check_livekit_configured() -> bool:
 
 
 def _load_cards() -> None:
-    """Load cards from persistent store, importing Portuguese deck on first run."""
+    """Load cards from persistent store.
+
+    On first run (empty store), no cards are auto-imported: users opt into
+    deck cards via the deck browser's "Add to my cards" button.
+    """
     global _active_cards
     loaded = _store.load()
     _active_cards.clear()
     _review_queue.clear()
     if loaded:
         _active_cards.extend(loaded)
-    else:
-        # First run: import the bundled Portuguese-Chinese deck
-        try:
-            from lingua.vocab.importers import load_palavras_essenciais
-            pe_path = "palavras-essenciais/guia.html"
-            imported = load_palavras_essenciais(pe_path)
-            _active_cards.extend(imported)
-            _store.save(_active_cards)
-        except Exception:
-            pass  # No bundled deck available
     _review_queue.extend(get_due_cards(_active_cards))
 
 
