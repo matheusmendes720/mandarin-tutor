@@ -4,7 +4,6 @@ from src.lingua.pronunciation.scorer import compute_phoneme_score, align_phoneme
 from src.lingua.pronunciation.whisper_scoring import WhisperPhonemeScorer
 from src.lingua.vocab.scheduler import Card, ReviewQuality, fsrs_schedule, create_card, get_due_cards
 from src.lingua.vocab.store import JsonStore
-from src.lingua.vocab.importers import load_palavras_essenciais
 from src.lingua.core.config import DeckConfig, PhonemeCatalogConfig
 from src.lingua.vocab.decks import PalavrasEssenciaisDeck
 from src.lingua.phoneme_drill.catalog import PinyinCompletoCatalog
