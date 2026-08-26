@@ -326,6 +326,8 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                     with gr.Row():
                         prev_card_btn = gr.Button("⬅ Previous")
                         next_card_btn = gr.Button("Next ➡")
+                        add_to_my_cards_btn = gr.Button("➕ Add to my cards", variant="primary")
+                    add_to_my_cards_status = gr.Textbox(label="Status", interactive=False)
                     deck_index = gr.State(value=0)
 
                     def _on_category_change(label: str) -> tuple[list[dict], int]:
@@ -339,6 +341,44 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                             return None, 0
                         new_index = (index + direction) % len(cards)
                         return play_deck_card_audio(cards[new_index]["id"]), new_index
+
+                    def add_deck_card_to_my_cards(
+                        category_label: str, index: int
+                    ) -> tuple[list[dict], list[dict], str]:
+                        """Idempotently add the currently-focused deck card to the active card store."""
+                        from datetime import datetime
+                        key = _cat_by_label.get(category_label)
+                        cards = list_deck_cards(key)
+                        if not cards or index < 0 or index >= len(cards):
+                            cards_out, queue_out = load_card_lists()
+                            return cards_out, queue_out, "No card selected."
+                        card_id = cards[index]["id"]
+                        existing_ids = {c.id for c in _active_cards}
+                        if card_id in existing_ids:
+                            cards_out, queue_out = load_card_lists()
+                            return cards_out, queue_out, f"Already in your cards: {card_id}"
+                        deck_card = _deck.card(card_id)
+                        if not deck_card:
+                            cards_out, queue_out = load_card_lists()
+                            return cards_out, queue_out, f"Card not found in deck: {card_id}"
+                        new_card = Card(
+                            id=deck_card["id"],
+                            front=deck_card["hanzi"],
+                            back=deck_card["pt"],
+                            pinyin=deck_card["pinyin"],
+                            context=deck_card["context"],
+                            cat=deck_card["cat"],
+                            tones=deck_card["tones"],
+                            audio_path=deck_card["audio_path"],
+                            due_date=datetime.now(),
+                            ease_factor=2.5,
+                            interval_days=0,
+                            repetitions=0,
+                        )
+                        _active_cards.append(new_card)
+                        _store.save(_active_cards)
+                        cards_out, queue_out = load_card_lists()
+                        return cards_out, queue_out, f"Added: {deck_card['hanzi']} ({deck_card['pinyin']})"
 
                     category_dropdown.change(
                         fn=_on_category_change,
@@ -354,6 +394,11 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                         fn=lambda label, idx: _navigate(label, idx, +1),
                         inputs=[category_dropdown, deck_index],
                         outputs=[deck_card_audio, deck_index],
+                    )
+                    add_to_my_cards_btn.click(
+                        fn=add_deck_card_to_my_cards,
+                        inputs=[category_dropdown, deck_index],
+                        outputs=[card_list, queue_list, add_to_my_cards_status],
                     )
 
                 add_btn.click(fn=add_flashcard, inputs=[new_front, new_back], outputs=[card_list, queue_list])
