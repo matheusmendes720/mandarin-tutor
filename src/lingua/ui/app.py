@@ -424,7 +424,7 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                         initial_dropdown = gr.Dropdown(
                             choices=_phoneme_catalog.initials() or _phoneme_drill.list_initials(),
                             label="Initial (声母)",
-                            value="ma",
+                            value="m",
                         )
                         final_dropdown = gr.Dropdown(
                             choices=_phoneme_catalog.finals() or _phoneme_drill.list_finals(),
@@ -456,7 +456,7 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                         combined_output = gr.Audio(label="Combined Audio")
                         gr.Markdown("#### Tone reference")
                         tone_info = gr.JSON(value=_phoneme_catalog.tones(), label="Tones (1-5)")
-                with gr.Accordion("📂 Browse phonemes by group", open=False):
+                with gr.Accordion("📂 Browse phonemes by group", open=True):
                     initials_browser = gr.JSON(value=_phoneme_catalog.initials(), label="Initials (声母)")
                     finals_browser = gr.JSON(value=_phoneme_catalog.finals(), label="Finals (韵母)")
 
