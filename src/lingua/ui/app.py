@@ -25,6 +25,44 @@ _voice_session: VoiceSession | None = None
 _current_review_card: Card | None = None
 
 
+def _render_deck_card_list(cards: list[dict]) -> str:
+    """Render a list of deck cards as an HTML table with per-row audio."""
+    if not cards:
+        return "<p>No cards in this category.</p>"
+    active_ids = {c.id for c in _active_cards}
+    rows = ""
+    for card in cards:
+        card_id = card.get("id", "")
+        hanzi = card.get("hanzi", "")
+        pinyin = card.get("pinyin", "") or ""
+        pt = card.get("pt", "")
+        audio_path = _deck.audio_path(card_id) if card_id else None
+        badge = " ✓" if card_id in active_ids else ""
+        audio_btn = (
+            f'<button onclick="'
+            f'document.getElementById(\'audio_{card_id}\').play()'
+            f'">🔊</button>'
+            f'<audio id="audio_{card_id}" src="{audio_path or ""}"></audio>'
+            if audio_path
+            else ""
+        )
+        rows += f"""
+<tr>
+  <td style="padding:4px 8px">
+    <strong style="font-size:1.1em">{hanzi}</strong>{badge}<br>
+    <span style="color:#666;font-size:0.9em">{pinyin}</span><br>
+    <span style="color:#444">{pt}</span>
+  </td>
+  <td style="padding:4px 8px;text-align:right;vertical-align:middle">
+    {audio_btn}
+  </td>
+</tr>"""
+    return f"""
+<table style="width:100%;border-collapse:collapse;font-family:sans-serif">
+  <tbody>{rows}</tbody>
+</table>"""
+
+
 def _card_audio_path(card: Card) -> str | None:
     """Derive audio path from card metadata.
 
@@ -164,9 +202,9 @@ def _card_to_display_dict(card: Card) -> dict:
     }
 
 
-def list_deck_cards(category_key: str | None) -> list[dict]:
-    """Return deck cards filtered by category_key (None = all)."""
-    return _deck.cards_by_category(category_key)
+def list_deck_cards(category_key: str | None) -> str:
+    cards = _deck.cards_by_category(category_key)
+    return _render_deck_card_list(cards)
 
 
 def list_deck_categories() -> list[dict]:
@@ -322,7 +360,7 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                         label="Filter by category",
                     )
                     deck_card_audio = gr.Audio(label="Selected card audio", type="filepath")
-                    deck_list = gr.JSON(label="Cards in selected category")
+                    deck_list = gr.HTML(label="Cards in selected category", value="")
                     with gr.Row():
                         prev_card_btn = gr.Button("⬅ Previous")
                         next_card_btn = gr.Button("Next ➡")
@@ -330,13 +368,13 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                     add_to_my_cards_status = gr.Textbox(label="Status", interactive=False)
                     deck_index = gr.State(value=0)
 
-                    def _on_category_change(label: str) -> tuple[list[dict], int]:
+                    def _on_category_change(label: str) -> tuple[str, int]:
                         key = _cat_by_label.get(label)
-                        return list_deck_cards(key), 0
+                        return _render_deck_card_list(_deck.cards_by_category(key)), 0
 
                     def _navigate(label: str, index: int, direction: int) -> tuple[str | None, int]:
                         key = _cat_by_label.get(label)
-                        cards = list_deck_cards(key)
+                        cards = _deck.cards_by_category(key)
                         if not cards:
                             return None, 0
                         new_index = (index + direction) % len(cards)
@@ -344,23 +382,23 @@ def build_app(config: dict | None = None) -> gr.Blocks:
 
                     def add_deck_card_to_my_cards(
                         category_label: str, index: int
-                    ) -> tuple[list[dict], list[dict], str]:
+                    ) -> tuple[str, list[dict], list[dict], str]:
                         """Idempotently add the currently-focused deck card to the active card store."""
                         from datetime import datetime
                         key = _cat_by_label.get(category_label)
-                        cards = list_deck_cards(key)
+                        cards = _deck.cards_by_category(key)
                         if not cards or index < 0 or index >= len(cards):
                             cards_out, queue_out = load_card_lists()
-                            return cards_out, queue_out, "No card selected."
+                            return _render_deck_card_list(_deck.cards_by_category(key)), cards_out, queue_out, "No card selected."
                         card_id = cards[index]["id"]
                         existing_ids = {c.id for c in _active_cards}
                         if card_id in existing_ids:
                             cards_out, queue_out = load_card_lists()
-                            return cards_out, queue_out, f"Already in your cards: {card_id}"
+                            return _render_deck_card_list(_deck.cards_by_category(key)), cards_out, queue_out, f"Already in your cards: {card_id}"
                         deck_card = _deck.card(card_id)
                         if not deck_card:
                             cards_out, queue_out = load_card_lists()
-                            return cards_out, queue_out, f"Card not found in deck: {card_id}"
+                            return _render_deck_card_list(_deck.cards_by_category(key)), cards_out, queue_out, f"Card not found in deck: {card_id}"
                         new_card = Card(
                             id=deck_card["id"],
                             front=deck_card["hanzi"],
@@ -378,7 +416,7 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                         _active_cards.append(new_card)
                         _store.save(_active_cards)
                         cards_out, queue_out = load_card_lists()
-                        return cards_out, queue_out, f"Added: {deck_card['hanzi']} ({deck_card['pinyin']})"
+                        return _render_deck_card_list(_deck.cards_by_category(key)), cards_out, queue_out, f"Added: {deck_card['hanzi']} ({deck_card['pinyin']})"
 
                     category_dropdown.change(
                         fn=_on_category_change,
@@ -398,7 +436,7 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                     add_to_my_cards_btn.click(
                         fn=add_deck_card_to_my_cards,
                         inputs=[category_dropdown, deck_index],
-                        outputs=[card_list, queue_list, add_to_my_cards_status],
+                        outputs=[deck_list, card_list, queue_list, add_to_my_cards_status],
                     )
 
                 add_btn.click(fn=add_flashcard, inputs=[new_front, new_back], outputs=[card_list, queue_list])
@@ -406,8 +444,8 @@ def build_app(config: dict | None = None) -> gr.Blocks:
                 play_audio_btn.click(fn=play_card_audio, outputs=[review_audio])
                 app.load(fn=load_card_lists, outputs=[card_list, queue_list])
                 app.load(
-                    fn=lambda: list_deck_cards(None),
-                    outputs=[deck_list],
+                    fn=lambda: (_render_deck_card_list(_deck.cards_by_category()), None),
+                    outputs=[deck_list, deck_index],
                 )
 
             with gr.TabItem("🗣️ Accent Analysis"):
