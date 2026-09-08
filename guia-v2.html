@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinyin — Trainer Auditivo</title>
+<link rel="stylesheet" href="pinyin-completo/css/trainer.css">
+
+<style>
+/* ============================================
+   v2 — DRILL DE TONS (Fine-tune)
+   ============================================ */
+
+.cell.drill {
+  border-color: var(--accent-purple);
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(163, 113, 247, 0.05) 100%);
+}
+.cell.drill:hover {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 20px rgba(163, 113, 247, 0.3);
+}
+.cell.drill-wide {
+  border-color: var(--accent-purple);
+  background: linear-gradient(90deg, rgba(88,166,255,0.08), rgba(63,185,80,0.08), rgba(210,153,34,0.08), rgba(248,81,73,0.08));
+  padding: 28px 20px;
+}
+.cell.drill-wide .pinyin {
+  font-size: 2.4em;
+  letter-spacing: 4px;
+}
+
+[data-theme="light"] .cell.drill {
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(130, 80, 223, 0.04) 100%);
+}
+[data-theme="light"] .cell.drill-wide {
+  background: linear-gradient(90deg, rgba(9,105,218,0.06), rgba(26,127,55,0.06), rgba(154,103,0,0.06), rgba(207,34,46,0.06));
+}
+
+/* Pair Comparison Cards */
+.pair-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 20px;
+  margin-top: 16px;
+}
+.pair-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s;
+}
+.pair-card:hover {
+  border-color: var(--accent-orange);
+  box-shadow: 0 0 20px rgba(240, 136, 62, 0.2);
+}
+.pair-title {
+  font-size: 0.95em;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  text-align: center;
+  font-weight: 500;
+}
+.pair-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pair-half {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  transition: all 0.2s;
+}
+.pair-half.active {
+  background: rgba(88, 166, 255, 0.15);
+  border: 1px solid var(--accent-blue);
+}
+.pair-hanzi {
+  font-size: 3.2em;
+  font-weight: bold;
+  color: var(--text-primary);
+  font-family: 'KaiTi', 'STKaiti', 'Kaiti SC', serif;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.pair-pinyin {
+  font-size: 1.4em;
+  color: var(--accent-blue);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.pair-meaning {
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-style: italic;
+}
+.pair-vs {
+  color: var(--accent-orange);
+  font-weight: bold;
+  font-size: 0.9em;
+}
+.pair-play, .pair-seq {
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.2s;
+  width: 100%;
+}
+.pair-play:hover {
+  background: #4a92e6;
+  transform: scale(1.02);
+}
+.pair-play.playing {
+  background: var(--accent-orange);
+  animation: pulse 1.5s infinite;
+}
+.pair-seq {
+  background: var(--accent-purple);
+  margin-top: 8px;
+}
+.pair-seq:hover {
+  background: #8a5ce0;
+}
+.pair-seq.playing {
+  background: var(--accent-orange);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@media (max-width: 640px) {
+  .pair-grid { grid-template-columns: 1fr; }
+  .pair-hanzi { font-size: 2.4em; }
+  .pair-pinyin { font-size: 1.1em; }
+}
+
+/* v2 banner */
+.v2-banner {
+  display: inline-block;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.7em;
+  margin-left: 8px;
+  vertical-align: middle;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<!-- Theme Toggle -->
+<button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+  <span id="theme-icon">🌙</span>
+</button>
+
+<div class="header">
+  <h1>🎧 Pinyin Trainer <span class="v2-banner">v2 · voz chinesa</span></h1>
+  <p class="subtitle">92 áudios · voz chinesa nativa · drill de tons · clique e ouça</p>
+</div>
+
+<!-- Navigation -->
+<nav class="nav">
+  <a href="#iniciais">Iniciais</a>
+  <a href="#finais">Finais</a>
+  <a href="#tons">Tons</a>
+  <a href="#drill">🎯 Fine-tune</a>
+  <a href="#sequencias">Sequências</a>
+</nav>
+
+<!-- Training Modal -->
+<div class="modal-overlay" id="trainingModal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+
+    <h3 id="modal-title">Título</h3>
+    <div class="pinyin-big" id="modal-pinyin">mā</div>
+    <div class="label" id="modal-label">inicial: b</div>
+
+    <!-- Phonetic Info -->
+    <div class="phonetic-info" id="phoneticInfo">
+      <div class="phonetic-row">
+        <span class="phonetic-label">IPA</span>
+        <span class="phonetic-value" id="modal-ipa">[ma˥˧]</span>
+      </div>
+      <div class="phonetic-row">
+        <span class="phonetic-label">Inicial</span>
+        <span class="phonetic-value" id="modal-initial">m</span>
+      </div>
+      <div class="phonetic-row">
+        <span class="phonetic-label">Final</span>
+        <span class="phonetic-value" id="modal-final">a</span>
+      </div>
+      <div class="phonetic-row">
+        <span class="phonetic-label">Tom</span>
+        <span class="phonetic-value" id="modal-tone">1º (alto plano)</span>
+      </div>
+      <div class="phonetic-row">
+        <span class="phonetic-label">Tono</span>
+        <span class="phonetic-value tone-number" id="modal-tone-num">˥˧</span>
+      </div>
+    </div>
+
+    <!-- Tone Visualizer -->
+    <svg class="tone-visualizer" id="toneVisualizer" viewBox="0 0 200 50">
+      <path class="tone-path" id="tonePath" d="" stroke="var(--accent-blue)"/>
+    </svg>
+
+    <!-- Playback Controls -->
+    <div class="playback-controls">
+      <button class="playback-btn primary" onclick="playReference()">▶ Ouvir Referência</button>
+      <button class="playback-btn" onclick="playSlow()">🐢 Lento</button>
+    </div>
+
+    <div class="speed-control">
+      <label>Velocidade:</label>
+      <select id="speedSelect" onchange="setPlaybackSpeed(this.value)">
+        <option value="1">1x</option>
+        <option value="0.75">0.75x</option>
+        <option value="0.5">0.5x</option>
+      </select>
+    </div>
+
+    <!-- Reference Audio -->
+    <div style="margin: 16px 0;">
+      <audio id="refAudio" controls preload="auto" style="width:100%"></audio>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="section" id="iniciais">
+  <h2><span class="icon">🔤</span> Iniciais (声母) — 21 sons</h2>
+  <p class="dica">Todas com vogal "a" no 1º tom · Foco: zh/ch/sh vs z/c/s, n/l, f/h</p>
+
+  <h3>Grupo 1: oclusivas e nasais</h3>
+  <div class="grid">
+    <div class="cell" data-pinyin="bā" data-label="b" data-ipa="[p]" data-audio="pinyin-completo/audio/iniciais/ba.wav" onclick="openTraining(this)"><div class="pinyin">bā</div><div class="ipa">[p]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="pā" data-label="p" data-ipa="[pʰ]" data-audio="pinyin-completo/audio/iniciais/pa.wav" onclick="openTraining(this)"><div class="pinyin">pā</div><div class="ipa">[pʰ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="mā" data-label="m" data-ipa="[m]" data-audio="pinyin-completo/audio/iniciais/ma.wav" onclick="openTraining(this)"><div class="pinyin">mā</div><div class="ipa">[m]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="fā" data-label="f" data-ipa="[f]" data-audio="pinyin-completo/audio/iniciais/fa.wav" onclick="openTraining(this)"><div class="pinyin">fā</div><div class="ipa">[f]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="dā" data-label="d" data-ipa="[t]" data-audio="pinyin-completo/audio/iniciais/da.wav" onclick="openTraining(this)"><div class="pinyin">dā</div><div class="ipa">[t]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="tā" data-label="t" data-ipa="[tʰ]" data-audio="pinyin-completo/audio/iniciais/ta.wav" onclick="openTraining(this)"><div class="pinyin">tā</div><div class="ipa">[tʰ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="nā" data-label="n" data-ipa="[n]" data-audio="pinyin-completo/audio/iniciais/na.wav" onclick="openTraining(this)"><div class="pinyin">nā</div><div class="ipa">[n]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="lā" data-label="l" data-ipa="[l]" data-audio="pinyin-completo/audio/iniciais/la.wav" onclick="openTraining(this)"><div class="pinyin">lā</div><div class="ipa">[l]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="gā" data-label="g" data-ipa="[k]" data-audio="pinyin-completo/audio/iniciais/ga.wav" onclick="openTraining(this)"><div class="pinyin">gā</div><div class="ipa">[k]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="kā" data-label="k" data-ipa="[kʰ]" data-audio="pinyin-completo/audio/iniciais/ka.wav" onclick="openTraining(this)"><div class="pinyin">kā</div><div class="ipa">[kʰ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="hā" data-label="h" data-ipa="[x]" data-audio="pinyin-completo/audio/iniciais/ha.wav" onclick="openTraining(this)"><div class="pinyin">hā</div><div class="ipa">[x]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>Grupo 2: sibilantes e palatais</h3>
+  <div class="grid">
+    <div class="cell" data-pinyin="zā" data-label="z" data-ipa="[ts]" data-audio="pinyin-completo/audio/iniciais/za.wav" onclick="openTraining(this)"><div class="pinyin">zā</div><div class="ipa">[ts]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="cā" data-label="c" data-ipa="[tsʰ]" data-audio="pinyin-completo/audio/iniciais/ca.wav" onclick="openTraining(this)"><div class="pinyin">cā</div><div class="ipa">[tsʰ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="sā" data-label="s" data-ipa="[s]" data-audio="pinyin-completo/audio/iniciais/sa.wav" onclick="openTraining(this)"><div class="pinyin">sā</div><div class="ipa">[s]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="zhā" data-label="zh" data-ipa="[tʂ]" data-audio="pinyin-completo/audio/iniciais/zha.wav" onclick="openTraining(this)"><div class="pinyin">zhā</div><div class="ipa">[tʂ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="chā" data-label="ch" data-ipa="[tʂʰ]" data-audio="pinyin-completo/audio/iniciais/cha.wav" onclick="openTraining(this)"><div class="pinyin">chā</div><div class="ipa">[tʂʰ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="shā" data-label="sh" data-ipa="[ʂ]" data-audio="pinyin-completo/audio/iniciais/sha.wav" onclick="openTraining(this)"><div class="pinyin">shā</div><div class="ipa">[ʂ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="rā" data-label="r" data-ipa="[ɻ]" data-audio="pinyin-completo/audio/iniciais/ra.wav" onclick="openTraining(this)"><div class="pinyin">rā</div><div class="ipa">[ɻ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="jiā" data-label="j" data-ipa="[tɕ]" data-audio="pinyin-completo/audio/iniciais/jia.wav" onclick="openTraining(this)"><div class="pinyin">jiā</div><div class="ipa">[tɕ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="qiā" data-label="q" data-ipa="[tɕʰ]" data-audio="pinyin-completo/audio/iniciais/qia.wav" onclick="openTraining(this)"><div class="pinyin">qiā</div><div class="ipa">[tɕʰ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="xiā" data-label="x" data-ipa="[ɕ]" data-audio="pinyin-completo/audio/iniciais/xia.wav" onclick="openTraining(this)"><div class="pinyin">xiā</div><div class="ipa">[ɕ]</div><div class="progress-bar"></div></div>
+  </div>
+</div>
+
+<div class="section" id="finais">
+  <h2><span class="icon">📦</span> Finais (韵母)</h2>
+
+  <h3>Simples</h3>
+  <div class="grid">
+    <div class="cell" data-pinyin="ā" data-label="a" data-ipa="[a]" data-audio="pinyin-completo/audio/finais/a.wav" onclick="openTraining(this)"><div class="pinyin">ā</div><div class="ipa">[a]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ō" data-label="o" data-ipa="[o]" data-audio="pinyin-completo/audio/finais/o.wav" onclick="openTraining(this)"><div class="pinyin">ō</div><div class="ipa">[o]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ē" data-label="e" data-ipa="[ɤ]" data-audio="pinyin-completo/audio/finais/e.wav" onclick="openTraining(this)"><div class="pinyin">ē</div><div class="ipa">[ɤ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ī" data-label="i" data-ipa="[i]" data-audio="pinyin-completo/audio/finais/i.wav" onclick="openTraining(this)"><div class="pinyin">ī</div><div class="ipa">[i]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ū" data-label="u" data-ipa="[u]" data-audio="pinyin-completo/audio/finais/u.wav" onclick="openTraining(this)"><div class="pinyin">ū</div><div class="ipa">[u]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ǖ" data-label="ü" data-ipa="[y]" data-audio="pinyin-completo/audio/finais/v.wav" onclick="openTraining(this)"><div class="pinyin">ǖ</div><div class="ipa">[y]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ér" data-label="er" data-ipa="[ɚ]" data-audio="pinyin-completo/audio/finais/er.wav" onclick="openTraining(this)"><div class="pinyin">ér</div><div class="ipa">[ɚ]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>Ditongos</h3>
+  <div class="grid">
+    <div class="cell" data-pinyin="āi" data-label="ai" data-ipa="[aɪ]" data-audio="pinyin-completo/audio/finais/ai.wav" onclick="openTraining(this)"><div class="pinyin">āi</div><div class="ipa">[aɪ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ēi" data-label="ei" data-ipa="[eɪ]" data-audio="pinyin-completo/audio/finais/ei.wav" onclick="openTraining(this)"><div class="pinyin">ēi</div><div class="ipa">[eɪ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="wēi" data-label="ui" data-ipa="[weɪ]" data-audio="pinyin-completo/audio/finais/ui.wav" onclick="openTraining(this)"><div class="pinyin">wēi</div><div class="ipa">[weɪ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="āo" data-label="ao" data-ipa="[aʊ]" data-audio="pinyin-completo/audio/finais/ao.wav" onclick="openTraining(this)"><div class="pinyin">āo</div><div class="ipa">[aʊ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ōu" data-label="ou" data-ipa="[oʊ]" data-audio="pinyin-completo/audio/finais/ou.wav" onclick="openTraining(this)"><div class="pinyin">ōu</div><div class="ipa">[oʊ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="yōu" data-label="iu" data-ipa="[iʊ]" data-audio="pinyin-completo/audio/finais/iu.wav" onclick="openTraining(this)"><div class="pinyin">yōu</div><div class="ipa">[iʊ]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>Nasais (-n)</h3>
+  <div class="grid">
+    <div class="cell" data-pinyin="ān" data-label="an" data-ipa="[an]" data-audio="pinyin-completo/audio/finais/an.wav" onclick="openTraining(this)"><div class="pinyin">ān</div><div class="ipa">[an]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ēn" data-label="en" data-ipa="[ən]" data-audio="pinyin-completo/audio/finais/en.wav" onclick="openTraining(this)"><div class="pinyin">ēn</div><div class="ipa">[ən]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="yīn" data-label="in" data-ipa="[in]" data-audio="pinyin-completo/audio/finais/in.wav" onclick="openTraining(this)"><div class="pinyin">yīn</div><div class="ipa">[in]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="wēn" data-label="un" data-ipa="[uən]" data-audio="pinyin-completo/audio/finais/un.wav" onclick="openTraining(this)"><div class="pinyin">wēn</div><div class="ipa">[uən]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ūn" data-label="ün" data-ipa="[yn]" data-audio="pinyin-completo/audio/finais/vn.wav" onclick="openTraining(this)"><div class="pinyin">ūn</div><div class="ipa">[yn]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>Nasais (-ng)</h3>
+  <div class="grid">
+    <div class="cell" data-pinyin="āng" data-label="ang" data-ipa="[aŋ]" data-audio="pinyin-completo/audio/finais/ang.wav" onclick="openTraining(this)"><div class="pinyin">āng</div><div class="ipa">[aŋ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="ēng" data-label="eng" data-ipa="[ɤŋ]" data-audio="pinyin-completo/audio/finais/eng.wav" onclick="openTraining(this)"><div class="pinyin">ēng</div><div class="ipa">[ɤŋ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="yīng" data-label="ing" data-ipa="[iŋ]" data-audio="pinyin-completo/audio/finais/ing.wav" onclick="openTraining(this)"><div class="pinyin">yīng</div><div class="ipa">[iŋ]</div><div class="progress-bar"></div></div>
+    <div class="cell" data-pinyin="wēng" data-label="ong" data-ipa="[ʊŋ]" data-audio="pinyin-completo/audio/finais/ong.wav" onclick="openTraining(this)"><div class="pinyin">wēng</div><div class="ipa">[ʊŋ]</div><div class="progress-bar"></div></div>
+  </div>
+</div>
+
+<div class="section" id="tons">
+  <h2><span class="icon">🎵</span> Tonalidades (声调) — 5 tons</h2>
+  <p class="dica">O 3º tom aparece mais curto (sandhi: antes de outro 3º vira 2º)</p>
+  <div class="grid">
+    <div class="cell pair" data-pinyin="mā" data-label="1ºtom" data-ipa="[ma˥˩]" data-audio="pinyin-completo/audio/tonalidades/ma1.wav" onclick="openTraining(this)" data-tone="1"><div class="pinyin">mā</div><div class="ipa">[ma˥˩]</div><div class="label">1º · alto plano</div><div class="progress-bar"></div></div>
+    <div class="cell pair" data-pinyin="má" data-label="2ºtom" data-ipa="[ma˧˥]" data-audio="pinyin-completo/audio/tonalidades/ma2.wav" onclick="openTraining(this)" data-tone="2"><div class="pinyin">má</div><div class="ipa">[ma˧˥]</div><div class="label">2º · ascendente</div><div class="progress-bar"></div></div>
+    <div class="cell pair" data-pinyin="mǎ" data-label="3ºtom" data-ipa="[ma˨˩˦]" data-audio="pinyin-completo/audio/tonalidades/ma3.wav" onclick="openTraining(this)" data-tone="3"><div class="pinyin">mǎ</div><div class="ipa">[ma˨˩˦]</div><div class="label">3º · baixo-ascendente</div><div class="progress-bar"></div></div>
+    <div class="cell pair" data-pinyin="mà" data-label="4ºtom" data-ipa="[ma˥˩]" data-audio="pinyin-completo/audio/tonalidades/ma4.wav" onclick="openTraining(this)" data-tone="4"><div class="pinyin">mà</div><div class="ipa">[ma˥˩]</div><div class="label">4º · descendente</div><div class="progress-bar"></div></div>
+    <div class="cell pair" data-pinyin="ma" data-label="neutro" data-ipa="[ma]" data-audio="pinyin-completo/audio/tonalidades/ma5.wav" onclick="openTraining(this)" data-tone="0"><div class="pinyin">ma</div><div class="ipa">[ma̰]</div><div class="label">neutro · leve</div><div class="progress-bar"></div></div>
+  </div>
+</div>
+
+<!-- ============================================
+     🎯 FINE-TUNE DOS TONS - DRILL AVANÇADO (v2)
+     ============================================ -->
+<div class="section" id="drill">
+  <h2><span class="icon">🎯</span> Fine-tune dos Tons — Drill Avançado</h2>
+  <p class="dica">Treino focado em discriminação tonal. <strong>Use fone de ouvido.</strong> Clique e repita em voz alta.</p>
+
+  <h3>🎼 4 tons isolados de "ma"</h3>
+  <div class="grid">
+    <div class="cell drill" data-pinyin="mā" data-label="1º" data-tone="1" data-audio="pinyin-completo/audio/drill/ma_1.wav" onclick="openTraining(this)"><div class="pinyin">mā</div><div class="label">1º · alto plano</div><div class="ipa">[ma˥˧]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="má" data-label="2º" data-tone="2" data-audio="pinyin-completo/audio/drill/ma_2.wav" onclick="openTraining(this)"><div class="pinyin">má</div><div class="label">2º · ascendente</div><div class="ipa">[ma˧˥]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="mǎ" data-label="3º" data-tone="3" data-audio="pinyin-completo/audio/drill/ma_3.wav" onclick="openTraining(this)"><div class="pinyin">mǎ</div><div class="label">3º · dip-and-rise</div><div class="ipa">[ma˨˩˦]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="mà" data-label="4º" data-tone="4" data-audio="pinyin-completo/audio/drill/ma_4.wav" onclick="openTraining(this)"><div class="pinyin">mà</div><div class="label">4º · descendente</div><div class="ipa">[ma˥˩]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>🎵 Sequência contínua dos 4 tons</h3>
+  <div class="grid">
+    <div class="cell drill-wide" data-pinyin="mā-má-mǎ-mà" data-label="sequência" data-tone="0" data-audio="pinyin-completo/audio/drill/ma_sequence.wav" onclick="openTraining(this)"><div class="pinyin">mā · má · mǎ · mà</div><div class="label">4 tons em fluxo</div><div class="ipa">[ma˥˧] [ma˧˥] [ma˨˩˦] [ma˥˩]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>🔤 4 tons de "ba"</h3>
+  <div class="grid">
+    <div class="cell drill" data-pinyin="bā" data-label="1º" data-tone="1" data-audio="pinyin-completo/audio/drill/ba_1.wav" onclick="openTraining(this)"><div class="pinyin">bā</div><div class="label">1º</div><div class="ipa">[pa˥˧]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="bá" data-label="2º" data-tone="2" data-audio="pinyin-completo/audio/drill/ba_2.wav" onclick="openTraining(this)"><div class="pinyin">bá</div><div class="label">2º</div><div class="ipa">[pa˧˥]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="bǎ" data-label="3º" data-tone="3" data-audio="pinyin-completo/audio/drill/ba_3.wav" onclick="openTraining(this)"><div class="pinyin">bǎ</div><div class="label">3º</div><div class="ipa">[pa˨˩˦]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="bà" data-label="4º" data-tone="4" data-audio="pinyin-completo/audio/drill/ba_4.wav" onclick="openTraining(this)"><div class="pinyin">bà</div><div class="label">4º</div><div class="ipa">[pa˥˩]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>🔤 4 tons de "da"</h3>
+  <div class="grid">
+    <div class="cell drill" data-pinyin="dā" data-label="1º" data-tone="1" data-audio="pinyin-completo/audio/drill/da_1.wav" onclick="openTraining(this)"><div class="pinyin">dā</div><div class="label">1º</div><div class="ipa">[ta˥˧]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="dá" data-label="2º" data-tone="2" data-audio="pinyin-completo/audio/drill/da_2.wav" onclick="openTraining(this)"><div class="pinyin">dá</div><div class="label">2º</div><div class="ipa">[ta˧˥]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="dǎ" data-label="3º" data-tone="3" data-audio="pinyin-completo/audio/drill/da_3.wav" onclick="openTraining(this)"><div class="pinyin">dǎ</div><div class="label">3º</div><div class="ipa">[ta˨˩˦]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="dà" data-label="4º" data-tone="4" data-audio="pinyin-completo/audio/drill/da_4.wav" onclick="openTraining(this)"><div class="pinyin">dà</div><div class="label">4º</div><div class="ipa">[ta˥˩]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>🔀 Pares confundíveis (homófonos tonais)</h3>
+  <p class="dica">Soam quase iguais — só o tom salva. Treine ouvir A, depois B, depois comparar.</p>
+
+  <div class="pair-grid">
+    <div class="pair-card" data-audio="pinyin-completo/audio/drill/mom_horse.wav" data-split="1.2">
+      <div class="pair-title">Mãe × Cavalo</div>
+      <div class="pair-row">
+        <div class="pair-half">
+          <div class="pair-hanzi">妈</div>
+          <div class="pair-pinyin">mā</div>
+          <div class="pair-meaning">mãe</div>
+          <button class="pair-play" data-side="A">▶ A</button>
+        </div>
+        <div class="pair-vs">vs</div>
+        <div class="pair-half">
+          <div class="pair-hanzi">马</div>
+          <div class="pair-pinyin">mǎ</div>
+          <div class="pair-meaning">cavalo</div>
+          <button class="pair-play" data-side="B">▶ B</button>
+        </div>
+      </div>
+      <button class="pair-seq" data-mode="seq">▶ A → B (sequência)</button>
+    </div>
+
+    <div class="pair-card" data-audio="pinyin-completo/audio/drill/clothes_chair.wav" data-split="1.0">
+      <div class="pair-title">Roupa × Cadeira</div>
+      <div class="pair-row">
+        <div class="pair-half">
+          <div class="pair-hanzi">衣</div>
+          <div class="pair-pinyin">yī</div>
+          <div class="pair-meaning">roupa</div>
+          <button class="pair-play" data-side="A">▶ A</button>
+        </div>
+        <div class="pair-vs">vs</div>
+        <div class="pair-half">
+          <div class="pair-hanzi">椅</div>
+          <div class="pair-pinyin">yǐ</div>
+          <div class="pair-meaning">cadeira</div>
+          <button class="pair-play" data-side="B">▶ B</button>
+        </div>
+      </div>
+      <button class="pair-seq" data-mode="seq">▶ A → B (sequência)</button>
+    </div>
+
+    <div class="pair-card" data-audio="pinyin-completo/audio/drill/drink_river.wav" data-split="1.0">
+      <div class="pair-title">Beber × Rio</div>
+      <div class="pair-row">
+        <div class="pair-half">
+          <div class="pair-hanzi">喝</div>
+          <div class="pair-pinyin">hē</div>
+          <div class="pair-meaning">beber</div>
+          <button class="pair-play" data-side="A">▶ A</button>
+        </div>
+        <div class="pair-vs">vs</div>
+        <div class="pair-half">
+          <div class="pair-hanzi">河</div>
+          <div class="pair-pinyin">hé</div>
+          <div class="pair-meaning">rio</div>
+          <button class="pair-play" data-side="B">▶ B</button>
+        </div>
+      </div>
+      <button class="pair-seq" data-mode="seq">▶ A → B (sequência)</button>
+    </div>
+
+    <div class="pair-card" data-audio="pinyin-completo/audio/drill/all_capital.wav" data-split="1.0">
+      <div class="pair-title">Todos × Capital (mesmo hanzi, leitura diferente)</div>
+      <div class="pair-row">
+        <div class="pair-half">
+          <div class="pair-hanzi">都</div>
+          <div class="pair-pinyin">dōu</div>
+          <div class="pair-meaning">todos (advérbio)</div>
+          <button class="pair-play" data-side="A">▶ A</button>
+        </div>
+        <div class="pair-vs">vs</div>
+        <div class="pair-half">
+          <div class="pair-hanzi">都</div>
+          <div class="pair-pinyin">dū</div>
+          <div class="pair-meaning">capital (substantivo)</div>
+          <button class="pair-play" data-side="B">▶ B</button>
+        </div>
+      </div>
+      <button class="pair-seq" data-mode="seq">▶ A → B (sequência)</button>
+    </div>
+  </div>
+
+  <h3>🔄 Sandhi tonal (3+3 → 2+3)</h3>
+  <p class="dica">Quando dois 3°s se encontram, o primeiro <strong>automaticamente vira 2°</strong> na fala real. Você escreveu nǐ hǎo? Vai soar <strong>ní hǎo</strong>.</p>
+  <div class="grid">
+    <div class="cell drill-wide" data-pinyin="nǐ hǎo" data-label="你好" data-tone="3" data-audio="pinyin-completo/audio/drill/sandhi_nihao.wav" onclick="openTraining(this)"><div class="pinyin">nǐ hǎo</div><div class="label">你好 · vai soar "ní hǎo"</div><div class="ipa">[ni˨˩˦][xaʊ˨˩˦] → [ni˧˥][xaʊ˨˩˦]</div><div class="progress-bar"></div></div>
+    <div class="cell drill-wide" data-pinyin="hěn hǎo" data-label="很好" data-tone="3" data-audio="pinyin-completo/audio/drill/sandhi_henhao.wav" onclick="openTraining(this)"><div class="pinyin">hěn hǎo</div><div class="label">很好 · vai soar "hén hǎo"</div><div class="ipa">[xən˨˩˦][xaʊ˨˩˦] → [xən˧˥][xaʊ˨˩˦]</div><div class="progress-bar"></div></div>
+  </div>
+
+  <h3>◯ Tom neutro (partículas)</h3>
+  <p class="dica">Sem tom próprio — leve, curto. Segue a "cor" do tom anterior.</p>
+  <div class="grid">
+    <div class="cell drill" data-pinyin="ma" data-label="吗" data-tone="0" data-audio="pinyin-completo/audio/drill/neutral_ma.wav" onclick="openTraining(this)"><div class="pinyin">ma</div><div class="label">吗 · pergunta</div><div class="ipa">[ma̰]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="ne" data-label="呢" data-tone="0" data-audio="pinyin-completo/audio/drill/neutral_ne.wav" onclick="openTraining(this)"><div class="pinyin">ne</div><div class="label">呢 · "e...?"</div><div class="ipa">[nə̰]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="ba" data-label="吧" data-tone="0" data-audio="pinyin-completo/audio/drill/neutral_ba.wav" onclick="openTraining(this)"><div class="pinyin">ba</div><div class="label">吧 · sugestão</div><div class="ipa">[pa̰]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="de" data-label="的" data-tone="0" data-audio="pinyin-completo/audio/drill/neutral_de.wav" onclick="openTraining(this)"><div class="pinyin">de</div><div class="label">的 · possesivo</div><div class="ipa">[tə̰]</div><div class="progress-bar"></div></div>
+    <div class="cell drill" data-pinyin="le" data-label="了" data-tone="0" data-audio="pinyin-completo/audio/drill/neutral_le.wav" onclick="openTraining(this)"><div class="pinyin">le</div><div class="label">了 · completivo</div><div class="ipa">[lə̰]</div><div class="progress-bar"></div></div>
+  </div>
+</div>
+
+<div class="section" id="sequencias">
+  <h2><span class="icon">📋</span> Sequências contínuas</h2>
+  <div class="sequencia">
+    <div>
+      <div style="font-size:14px">📋 Iniciais Grupo 1 (b→l)</div>
+      <button onclick="playSequence('pinyin-completo/audio/tonalidades/sequencia_iniciais.wav')">▶ Tocar</button>
+    </div>
+    <div>
+      <div style="font-size:14px">📋 Iniciais Grupo 2 (z→x)</div>
+      <button onclick="playSequence('pinyin-completo/audio/tonalidades/sequencia_iniciais2.wav')">▶ Tocar</button>
+    </div>
+    <div>
+      <div style="font-size:14px">📋 Tons de "ma" (1→2→3→4→0)</div>
+      <button onclick="playSequence('pinyin-completo/audio/tonalidades/sequencia_tons.wav')">▶ Tocar</button>
+    </div>
+  </div>
+</div>
+
+<div class="tip">
+  <strong>💡 Como treinar:</strong> clique em qualquer card → <strong>ouça</strong> → repita 3x antes de trocar.
+</div>
+
+<!-- Scripts -->
+<script src="pinyin-completo/js/audio.js"></script>
+<script>
+// ============================================
+// PHONETIC DATABASE (Pinyin → IPA)
+// ============================================
+const PHONETIC_DB = {
+  // Initials
+  'b': { initial: 'b', ipa: 'p', type: 'occlusive' },
+  'p': { initial: 'p', ipa: 'pʰ', type: 'occlusive' },
+  'm': { initial: 'm', ipa: 'm', type: 'nasal' },
+  'f': { initial: 'f', ipa: 'f', type: 'fricative' },
+  'd': { initial: 'd', ipa: 't', type: 'occlusive' },
+  't': { initial: 't', ipa: 'tʰ', type: 'occlusive' },
+  'n': { initial: 'n', ipa: 'n', type: 'nasal' },
+  'l': { initial: 'l', ipa: 'l', type: 'liquid' },
+  'g': { initial: 'g', ipa: 'k', type: 'occlusive' },
+  'k': { initial: 'k', ipa: 'kʰ', type: 'occlusive' },
+  'h': { initial: 'h', ipa: 'x', type: 'fricative' },
+  'z': { initial: 'z', ipa: 'ts', type: 'sibilant' },
+  'c': { initial: 'c', ipa: 'tsʰ', type: 'sibilant' },
+  's': { initial: 's', ipa: 's', type: 'sibilant' },
+  'zh': { initial: 'zh', ipa: 'tʂ', type: 'retroflex' },
+  'ch': { initial: 'ch', ipa: 'tʂʰ', type: 'retroflex' },
+  'sh': { initial: 'sh', ipa: 'ʂ', type: 'retroflex' },
+  'r': { initial: 'r', ipa: 'ʐ', type: 'retroflex' },
+  'j': { initial: 'j', ipa: 'tɕ', type: 'palatal' },
+  'q': { initial: 'q', ipa: 'tɕʰ', type: 'palatal' },
+  'x': { initial: 'x', ipa: 'ɕ', type: 'palatal' },
+  'y': { initial: 'y', ipa: 'j', type: 'semivowel' },
+  'w': { initial: 'w', ipa: 'w', type: 'semivowel' },
+
+  // Finals
+  'a': { final: 'a', ipa: 'a' },
+  'o': { final: 'o', ipa: 'o' },
+  'e': { final: 'e', ipa: 'ɤ' },
+  'i': { final: 'i', ipa: 'i' },
+  'u': { final: 'u', ipa: 'u' },
+  'ü': { final: 'ü', ipa: 'y' },
+  'er': { final: 'er', ipa: 'ɚ' },
+  'ai': { final: 'ai', ipa: 'aɪ̯' },
+  'ei': { final: 'ei', ipa: 'eɪ̯' },
+  'ui': { final: 'ui', ipa: 'weɪ̯' },
+  'ao': { final: 'ao', ipa: 'aʊ̯' },
+  'ou': { final: 'ou', ipa: 'oʊ̯' },
+  'iu': { final: 'iu', ipa: 'iʊ̯' },
+  'ie': { final: 'ie', ipa: 'iɛ̯' },
+  'üe': { final: 'üe', ipa: 'yɛ̯' },
+  'an': { final: 'an', ipa: 'an' },
+  'en': { final: 'en', ipa: 'ən' },
+  'in': { final: 'in', ipa: 'in' },
+  'un': { final: 'un', ipa: 'un' },
+  'ün': { final: 'ün', ipa: 'yn' },
+  'ang': { final: 'ang', ipa: 'ɑŋ' },
+  'eng': { final: 'eng', ipa: 'əŋ' },
+  'ing': { final: 'ing', ipa: 'ɪŋ' },
+  'ong': { final: 'ong', ipa: 'ʊŋ' },
+};
+
+// Tone contours
+const TONES = {
+  1: { name: '1ºtom', desc: 'alto plano', ipa: '˥˧ (55)', color: 'var(--tone-1)' },
+  2: { name: '2ºtom', desc: 'ascendente', ipa: '˧˥ (35)', color: 'var(--tone-2)' },
+  3: { name: '3ºtom', desc: 'baixo-ascendente', ipa: '˨˩˧ (214)', color: 'var(--tone-3)' },
+  4: { name: '4ºtom', desc: 'descendente', ipa: '˥˩ (51)', color: 'var(--tone-4)' },
+  0: { name: 'neutro', desc: 'leve', ipa: '˨ (neutral)', color: 'var(--tone-5)' },
+};
+
+// ============================================
+// PHONETIC ANALYSIS
+// ============================================
+function getPhoneticData(pinyin, label, tone) {
+  // Extract initial and final from pinyin
+  let initial = '';
+  let final = pinyin;
+
+  // Common initials (longest first to catch zh/ch/sh before z/c/s)
+  const initials = ['zh', 'ch', 'sh', 'b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'z', 'c', 's', 'r', 'y', 'w'];
+
+  for (const ini of initials) {
+    if (pinyin.startsWith(ini)) {
+      initial = ini;
+      final = pinyin.slice(ini.length);
+      break;
+    }
+  }
+
+  // Remove tone mark to get base final
+  const finalBase = final.replace(/[āáǎà]/g, 'a')
+                         .replace(/[ōóǒò]/g, 'o')
+                         .replace(/[ēéěè]/g, 'e')
+                         .replace(/[īíǐì]/g, 'i')
+                         .replace(/[ūúǔù]/g, 'u')
+                         .replace(/[ǖǘǚǜ]/g, 'ü');
+
+  // Get IPA from database
+  const initialIPA = PHONETIC_DB[initial]?.ipa || initial;
+  const finalIPA = PHONETIC_DB[finalBase]?.ipa || finalBase;
+  const toneIPA = TONES[tone]?.ipa || '';
+
+  return {
+    initial: initial || '-',
+    final: finalBase || '-',
+    ipa: `[${initialIPA}${finalIPA}]${toneIPA}`
+  };
+}
+
+// Add IPA to all cells on page load
+function initPhoneticDisplay() {
+  document.querySelectorAll('.cell[data-pinyin]').forEach(cell => {
+    const pinyin = cell.dataset.pinyin;
+    const label = cell.dataset.label;
+    const tone = parseInt(cell.dataset.tone || 0);
+    const phonetic = getPhoneticData(pinyin, label, tone);
+
+    // Add IPA span if not exists
+    let ipaSpan = cell.querySelector('.ipa');
+    if (!ipaSpan) {
+      ipaSpan = document.createElement('span');
+      ipaSpan.className = 'ipa';
+      cell.appendChild(ipaSpan);
+    }
+    ipaSpan.textContent = phonetic.ipa;
+  });
+}
+
+// Run on load
+document.addEventListener('DOMContentLoaded', initPhoneticDisplay);
+
+// ============================================
+// GLOBAL STATE
+// ============================================
+let currentCell = null;
+
+// ============================================
+// THEME
+// ============================================
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-icon').textContent = isDark ? '☀️' : '🌙';
+}
+
+// Apply dark mode by default
+document.documentElement.setAttribute('data-theme', 'dark');
+
+// ============================================
+// TRAINING MODAL
+// ============================================
+function openTraining(cell) {
+  currentCell = cell;
+  const pinyin = cell.dataset.pinyin;
+  const label = cell.dataset.label;
+  const audio = cell.dataset.audio;
+  const tone = parseInt(cell.dataset.tone || 0);
+
+  document.getElementById('modal-pinyin').textContent = pinyin;
+  document.getElementById('modal-label').textContent = `inicial: ${label}`;
+
+  // Populate phonetic info
+  const phonetic = getPhoneticData(pinyin, label, tone);
+  document.getElementById('modal-ipa').textContent = phonetic.ipa;
+  document.getElementById('modal-initial').textContent = phonetic.initial;
+  document.getElementById('modal-final').textContent = phonetic.final;
+  document.getElementById('modal-tone').textContent = `${TONES[tone].name} (${TONES[tone].desc})`;
+  document.getElementById('modal-tone-num').textContent = TONES[tone].ipa;
+  document.getElementById('modal-title').textContent = '🎧 Treino Auditivo';
+
+  // Set tone visualizer
+  updateToneVisualizer(parseInt(tone));
+
+  // Setup audio
+  const refAudio = document.getElementById('refAudio');
+  refAudio.src = audio;
+
+  // Auto-play when card is clicked
+  refAudio.currentTime = 0;
+  refAudio.playbackRate = 1;
+  refAudio.load();
+  refAudio.play().then(() => {
+    // Add playing class to card for visual feedback
+    cell.classList.add('playing');
+  }).catch(e => console.warn('Audio play failed:', e));
+
+  // Update progress bar during playback
+  refAudio.ontimeupdate = () => {
+    const progressBar = cell.querySelector('.progress-bar');
+    if (progressBar && refAudio.duration) {
+      const percent = (refAudio.currentTime / refAudio.duration) * 100;
+      progressBar.style.width = `${percent}%`;
+    }
+  };
+
+  refAudio.onended = () => {
+    cell.classList.remove('playing');
+    const progressBar = cell.querySelector('.progress-bar');
+    if (progressBar) progressBar.style.width = '0%';
+  };
+
+  // Show modal
+  document.getElementById('trainingModal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('trainingModal').classList.remove('active');
+  pinyinAudio.stop();
+}
+
+// ============================================
+// TONE VISUALIZER
+// ============================================
+function updateToneVisualizer(tone) {
+  const tonePaths = {
+    0: 'M 0,25 L 200,25',  // neutral flat
+    1: 'M 0,10 L 200,10',   // high flat
+    2: 'M 0,35 L 80,10 L 200,35',  // rising
+    3: 'M 0,35 L 60,35 L 100,10 L 140,35 L 200,35',  // dipping
+    4: 'M 0,10 L 200,40'    // falling
+  };
+
+  const toneColors = {
+    0: 'var(--text-muted)',
+    1: 'var(--tone-1)',
+    2: 'var(--tone-2)',
+    3: 'var(--tone-3)',
+    4: 'var(--tone-4)'
+  };
+
+  const path = document.getElementById('tonePath');
+  path.setAttribute('d', tonePaths[tone] || tonePaths[0]);
+  path.setAttribute('stroke', toneColors[tone] || toneColors[0]);
+}
+
+// ============================================
+// PLAYBACK CONTROLS
+// ============================================
+function playReference() {
+  const audio = document.getElementById('refAudio');
+  if (audio.src) {
+    audio.currentTime = 0;
+    audio.playbackRate = 1;
+    audio.load(); // Force preload before play
+    audio.play().catch(e => console.warn('Audio play failed:', e));
+  }
+}
+
+function playSlow() {
+  const audio = document.getElementById('refAudio');
+  if (audio.src) {
+    audio.currentTime = 0;
+    audio.playbackRate = 0.5;
+    audio.load(); // Force preload before play
+    audio.play().catch(e => console.warn('Audio play failed:', e));
+  }
+}
+
+function setPlaybackSpeed(speed) {
+  const audio = document.getElementById('refAudio');
+  audio.playbackRate = parseFloat(speed);
+}
+
+function playSequence(src) {
+  const audio = new Audio(src);
+  audio.play();
+}
+
+// ============================================
+// KEYBOARD SHORTCUTS
+// ============================================
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeModal();
+  }
+  if (e.key === ' ') {
+    e.preventDefault();
+    playReference();
+  }
+});
+
+// ============================================
+// v2 — PAIR PLAYER (drill de tons)
+// ============================================
+let pairAudio = null;
+
+function stopPairAudio() {
+  if (pairAudio) {
+    pairAudio.pause();
+    pairAudio.currentTime = 0;
+    pairAudio = null;
+  }
+  document.querySelectorAll('.pair-play.playing, .pair-seq.playing').forEach(b => b.classList.remove('playing'));
+  document.querySelectorAll('.pair-half.active').forEach(h => h.classList.remove('active'));
+}
+
+function playPairHalf(btn) {
+  const card = btn.closest('.pair-card');
+  const audioSrc = card.dataset.audio;
+  const split = parseFloat(card.dataset.split || 1.0);
+  const side = btn.dataset.side;
+
+  // If currently playing this same button, stop
+  if (btn.classList.contains('playing')) {
+    stopPairAudio();
+    return;
+  }
+
+  stopPairAudio();
+
+  pairAudio = new Audio(audioSrc);
+  pairAudio.preload = 'auto';
+
+  if (side === 'A') {
+    pairAudio.currentTime = 0;
+    // Play A (up to split) — for short pause, use end listener
+  } else {
+    pairAudio.currentTime = split;
+  }
+
+  btn.classList.add('playing');
+  card.querySelector(`.pair-half:nth-child(${side === 'A' ? 1 : 3})`).classList.add('active');
+
+  pairAudio.onended = () => {
+    btn.classList.remove('playing');
+    card.querySelectorAll('.pair-half').forEach(h => h.classList.remove('active'));
+  };
+
+  pairAudio.play().catch(e => {
+    console.warn('Pair play failed:', e);
+    btn.classList.remove('playing');
+  });
+}
+
+function playPairSeq(btn) {
+  const card = btn.closest('.pair-card');
+  const audioSrc = card.dataset.audio;
+
+  if (btn.classList.contains('playing')) {
+    stopPairAudio();
+    return;
+  }
+
+  stopPairAudio();
+
+  pairAudio = new Audio(audioSrc);
+  pairAudio.preload = 'auto';
+  pairAudio.currentTime = 0;
+  btn.classList.add('playing');
+
+  pairAudio.onended = () => {
+    btn.classList.remove('playing');
+    card.querySelectorAll('.pair-half').forEach(h => h.classList.remove('active'));
+  };
+
+  pairAudio.play().catch(e => {
+    console.warn('Pair seq failed:', e);
+    btn.classList.remove('playing');
+  });
+}
+
+// Wire up pair buttons
+document.querySelectorAll('.pair-play').forEach(btn => {
+  btn.addEventListener('click', () => playPairHalf(btn));
+});
+document.querySelectorAll('.pair-seq').forEach(btn => {
+  btn.addEventListener('click', () => playPairSeq(btn));
+});
+
+// Stop pair audio when opening training modal
+const _openTrainingOriginal = openTraining;
+openTraining = function(cell) {
+  stopPairAudio();
+  _openTrainingOriginal(cell);
+};
+</script>
+</body>
+</html>

@@ -100,7 +100,8 @@ POST /generate
 ### Role
 
 A conversational Mandarin tutor that:
-- Speaks only Mandarin (configurable to include Portuguese explanations for beginners)
+- Acts as an English-speaking teacher who teaches entirely in Mandarin (immersive, no crutches)
+- Speaks only Mandarin during lessons — the English persona explains context in Mandarin only
 - Detects when the user makes tone errors and triggers targeted drill
 - Detects when vocab is misused and drills it
 - Builds sentences using only words the user already knows
@@ -185,27 +186,26 @@ Vocabulary is managed by the existing `vocab/scheduler.py` (FSRS algorithm). Eac
 
 ## 7. CLI Interface
 
-Single command:
+Commands:
 
 ```bash
+# Start voice session (main command)
 python -m lingua
-```
 
-Or with options:
+# Import vocab from external study repo (one-time setup)
+python -m lingua import-vocab
 
-```bash
-python -m lingua --tutor-level beginner  # Portuguese explanations on
+# With options
 python -m lingua --profile zh-tutor-female
-python -m lingua --llm-provider ollama     # use local Ollama
-python -m lingua --llm-url http://localhost:11434
+python -m lingua --llm-url https://api.minimax.chat/v1
 ```
 
-On launch:
+On `lingua` launch:
 - Check VoiceStudio connectivity (`GET /model/status`)
 - Connect to LLM provider
 - Begin audio loop immediately — no menus, no typing
 
-Exit: say "再见" or press Ctrl+C
+Exit: say "再见" (zàijiàn) or press Ctrl+C
 
 ---
 
@@ -218,13 +218,18 @@ All config via environment variables + optional `lingua.toml`:
 url = "http://127.0.0.1:3900"
 profile_id = "zh-tutor-female"
 reference_profile_id = "zh-reference"
-engine = "openai"   # or "coqui", "elevenlabs"
+engine = "openai"
 
 [llm]
-provider = "openai"   # or "ollama", "lmstudio"
-url = "https://api.openai.com/v1"
-model = "gpt-4o-mini"
-api_key = "${OPENAI_API_KEY}"
+provider = "minimax"   # OpenAI-compatible
+url = "https://api.minimax.chat/v1"
+model = "MiniMax-Text-01"
+api_key = "${MINIMAX_API_KEY}"
+
+[vocab]
+# Initial vocab bootstrapped from external HSK study repo
+source_path = "G:/Other computers/My Laptop/notas_estudo/2_projeto/mandarin-learning"
+store_path = "data/vocab.json"
 
 [audio]
 sample_rate = 16000
@@ -237,9 +242,16 @@ store_path = "data/vocab.json"
 
 ---
 
-## 9. FSRS Scheduler
+## 9. Vocab Source & FSRS Scheduler
 
-Existing `vocab/scheduler.py` implements FSRS. State is a JSON file at `data/vocab.json`.
+Initial vocab is bootstrapped from `G:/Other computers/My Laptop/notas_estudo/2_projeto/mandarin-learning/` which contains structured markdown files:
+- `03_essential-vocabulary-186.md` — 186 core words with Hanzi, Pinyin, Portuguese/English translations
+- `09_course-chinese-do-zero-10days.md` — 10-day structured course with progressive lessons
+- `01b_alphabet-sounds-layered.md`, `02_syllable-chart.md`, `04_tone-rules.md` — phonetics and tone reference
+
+A one-time import step (`lingua import-vocab`) parses these files and creates FSRS cards in `data/vocab.json`.
+
+FSRS state is a JSON file at `data/vocab.json`.
 
 Card record:
 ```json
@@ -275,19 +287,23 @@ Card record:
 ```
 src/lingua/
 ├── __init__.py
-├── __main__.py          # CLI entry point
+├── __main__.py           # CLI entry point + command dispatch
 ├── voice_studio.py       # VoiceStudio HTTP client (ASR + TTS)
 ├── tutor.py              # MandarinTutor LLM agent
 ├── audio_loop.py         # Record → ASR → LLM → TTS → playback
 ├── tone_drill.py         # Tone training loop
 ├── vocab_drill.py        # FSRS vocab drill via voice
-├── config.py             # Config dataclasses
-└── vocab/
+├── config.py             # Config dataclasses + .toml loading
+├── vocab/
+│   ├── __init__.py
+│   ├── scheduler.py      # FSRS implementation
+│   ├── store.py         # JSON card store
+│   └── importer.py      # Import from markdown study files
+└── prompts/
     ├── __init__.py
-    ├── scheduler.py      # FSRS implementation
-    └── store.py         # JSON card store
+    └── tutor.py          # System prompts for tutor persona
 
-data/                     # Runtime data (gitignored)
+data/                      # Runtime data (gitignored)
 ├── vocab.json
 └── sessions/
 

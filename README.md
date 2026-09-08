@@ -6,5 +6,5 @@ A unified language learning platform with pronunciation scoring, TTS synthesis, 
 
 ```bash
 pip install -e .
-python -m src.lingua.ui.app
+python -m lingua.ui.app
 ```
