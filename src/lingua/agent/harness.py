@@ -12,6 +12,7 @@ from ..audio_loop import stream_audio_chunks
 from ..asr import stream_transcribe
 from ..tutor import MandarinTutor
 from ..voice_studio import VoiceStudioClient
+from .router import TurnRouter
 from .vad import VoiceActivityDetector
 
 if TYPE_CHECKING:
@@ -54,6 +55,8 @@ class VoiceAgentHarness:
 
         # Voice activity detector for turn switching
         self._vad = VoiceActivityDetector(energy_threshold=0.01)
+        # Turn router for multi-lingual routing
+        self._router = TurnRouter()
         # State: "listening" | "speaking"
         self._state = "listening"
 
@@ -148,7 +151,9 @@ class VoiceAgentHarness:
                     logger.info("ASR final transcript: %s", text)
                     # Only process non-empty transcripts
                     if text.strip():
-                        await self._process_transcript(text)
+                        # Build segments with language detection (default to zh for now)
+                        segments = [{"text": text, "language": result.get("language", "zh")}]
+                        await self._process_transcript(segments)
                 elif result_type == "error":
                     logger.error("ASR error: %s", text)
         except asyncio.CancelledError:
@@ -158,15 +163,22 @@ class VoiceAgentHarness:
             logger.error("Error in ASR transcription: %s", e)
             raise
 
-    async def _process_transcript(self, text: str) -> None:
+    async def _process_transcript(self, segments: list[dict]) -> None:
         """Process a final transcript through the tutor.
 
         Parameters
         ----------
-        text : str
-            The transcribed text to process.
+        segments : list[dict]
+            List of ASR segment dicts with "text" and "language" keys.
         """
         try:
+            # Route the turn based on language
+            routed = self._router.route(segments)
+            text = routed.full_text
+
+            # Determine turn type from routing
+            turn_type = routed.type
+
             turn = self.tutor._ask_llm(text)
             logger.info(
                 "Tutor response: type=%s, text=%s",
