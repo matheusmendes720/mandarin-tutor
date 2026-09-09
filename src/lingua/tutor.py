@@ -168,6 +168,19 @@ class MandarinTutor:
                 except json.JSONDecodeError:
                     continue
 
+        # Flush any remaining buffered text as a final sentence — if the LLM
+        # ended without a delimiter (e.g. "你好" with no 。) we still want the
+        # harness to speak it.
+        if emitted_len < len(full_text):
+            tail_sentence = full_text[emitted_len:].strip()
+            if tail_sentence:
+                sentences.append(tail_sentence)
+                if on_sentence:
+                    if is_coroutine:
+                        pass  # harness handles via direct call after return
+                    else:
+                        on_sentence(tail_sentence, full_text)
+
         return full_text, sentences
 
     def _ask_llm(self, user_message: str) -> TutorTurn:
