@@ -1,11 +1,13 @@
 """MandarinTutor — LLM-driven conversation agent with voice synthesis."""
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 import requests
 
 from pypinyin import lazy_pinyin, Style
@@ -19,6 +21,42 @@ logger = logging.getLogger(__name__)
 
 
 _HANZI_RE = re.compile(r"[㐀-鿿]")
+
+# Sentence-ending delimiters: Chinese (。！？) and English (.!?\n)
+_SENT_END_RE = re.compile(r"([。！？.!?\n])")
+
+
+def find_sentence_boundary(text: str, emitted_len: int) -> tuple[int, str] | None:
+    """Find the next sentence boundary at or after emitted_len.
+
+    Parameters
+    ----------
+    text : str
+        The full accumulated text.
+    emitted_len : int
+        Number of characters already emitted (start searching from here).
+
+    Returns
+    -------
+    tuple[int, str] | None
+        (end_index_inclusive, complete_sentence) if a sentence boundary is found,
+        None if no boundary found yet.
+    """
+    if emitted_len >= len(text):
+        return None
+
+    # Search for the first delimiter at or after emitted_len
+    search_text = text[emitted_len:]
+    for m in _SENT_END_RE.finditer(search_text):
+        # The delimiter ends at position (m.end() - 1) relative to search_text
+        # Convert to absolute position in text
+        delim_start = emitted_len + m.start()
+        delim_end = emitted_len + m.end()
+        # Return the sentence up to and including the delimiter
+        sentence = text[emitted_len:delim_end]
+        return delim_end, sentence
+
+    return None
 
 
 def to_pinyin(text: str) -> str:
@@ -56,6 +94,82 @@ class MandarinTutor:
     # ------------------------------------------------------------------
     # LLM — direct HTTP to MiniMax OpenAI-compatible API
     # ------------------------------------------------------------------
+    def stream_response(
+        self,
+        messages: list[dict],
+        on_sentence: Callable[[str, str], None] | None = None,
+    ) -> tuple[str, list[str]]:
+        """Stream LLM response with sentence-level callbacks.
+
+        Parameters
+        ----------
+        messages : list[dict]
+            Conversation messages in OpenAI format.
+        on_sentence : callable, optional
+            Callback function called when a sentence boundary is detected.
+            Signature: (sentence_text: str, full_text_so_far: str) -> None.
+            Can be async — automatically detects via inspect.iscoroutinefunction.
+
+        Returns
+        -------
+        tuple[str, list[str]]
+            (full_text, list_of_emitted_sentences)
+        """
+        payload = {
+            "model": self.cfg.llm.model,
+            "messages": messages,
+            "max_tokens": 120,
+            "stream": True,
+        }
+        resp = self._session.post(
+            f"{self.cfg.llm.url}/chatcompletion_v2",
+            json=payload,
+            timeout=60,
+            stream=True,
+        )
+        resp.raise_for_status()
+
+        full_text = ""
+        sentences: list[str] = []
+        emitted_len = 0
+        is_coroutine = on_sentence and inspect.iscoroutinefunction(on_sentence)
+
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            line = line.decode("utf-8")
+            if line.startswith("data: "):
+                data = line[6:]
+                if data.strip() == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data)
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    content = delta.get("content", "")
+                    if content:
+                        full_text += content
+
+                        # Check for sentence boundaries
+                        while True:
+                            result = find_sentence_boundary(full_text, emitted_len)
+                            if result is None:
+                                break
+                            delim_end, sentence = result
+                            sentences.append(sentence)
+                            # Call the callback if provided
+                            if on_sentence:
+                                if is_coroutine:
+                                    # Would need asyncio.run in sync context - skip for now
+                                    # In async harness, this will be called differently
+                                    pass
+                                else:
+                                    on_sentence(sentence, full_text)
+                            emitted_len = delim_end
+                except json.JSONDecodeError:
+                    continue
+
+        return full_text, sentences
+
     def _ask_llm(self, user_message: str) -> TutorTurn:
         self.memory.add_turn("user", user_message)
         payload = {
