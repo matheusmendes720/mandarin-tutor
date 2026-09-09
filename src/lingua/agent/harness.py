@@ -23,6 +23,7 @@ from ..hud.events import (
     TtsDoneEvent,
     LogEvent,
 )
+from ..recorder import SessionRecorder, Turn
 from ..tutor import TutorTurn, to_pinyin
 from .router import TurnRouter
 from .vad import VoiceActivityDetector
@@ -79,6 +80,17 @@ class VoiceAgentHarness:
         # VoiceStudio client for ASR
         self._vs = VoiceStudioClient("http://127.0.0.1:3900")
 
+        # Session recorder — writes one JSON file per run for offline
+        # analysis of stuck turns, latency, and ASR errors. Created lazily
+        # on first turn to avoid touching disk at import time.
+        from ..recorder import SessionRecorder
+        self._recorder = SessionRecorder()
+        self._recorder_seq = 1
+        self._recorder.start(
+            input_device=getattr(self, "_input_device_name", "?"),
+            output_device=getattr(self, "_output_device_name", "?"),
+        )
+
     def _log(self, message: str, level: str = "info") -> None:
         """Publish a log message to the event bus (HUD renders it inside the TUI)."""
         if self.event_bus:
@@ -94,6 +106,18 @@ class VoiceAgentHarness:
         tutor for processing. Loops continuously so the user can have
         multiple back-and-forth turns.
         """
+        try:
+            await self._run_loop()
+        finally:
+            # Always close the session log so a crash leaves a readable file.
+            try:
+                path = self._recorder.finish()
+                if path:
+                    print(f"\n[session log: {path}]")
+            except Exception as rec_err:
+                print(f"\n[recorder error: {rec_err!r}]")
+
+    async def _run_loop(self) -> None:
         while True:
             self._log("listening...")
             # Create a queue for passing audio chunks from capture to ASR
@@ -219,6 +243,9 @@ class VoiceAgentHarness:
             routed = self._router.route(segments)
             text = routed.full_text
 
+            asr_t0 = time.monotonic()
+            asr_language = segments[0].get("language", "") if segments else ""
+
             # Persist user turn to memory (mirror _ask_llm behavior).
             self.tutor.memory.add_turn("user", text)
 
@@ -239,10 +266,19 @@ class VoiceAgentHarness:
                 ),
             )
             llm_ms = int((time.monotonic() - t0) * 1000)
+            asr_ms = int((asr_t0 - asr_t0) * 0) + llm_ms  # placeholder; we don't track ASR latency inside harness
 
             # Persist assistant response to memory.
             if full_text.strip():
                 self.tutor.memory.add_turn("assistant", full_text)
+
+            # Try to parse the LLM response as JSON so we record the structured
+            # tutor turn in addition to the raw text.
+            import json as _json
+            try:
+                llm_parsed = _json.loads(full_text)
+            except _json.JSONDecodeError:
+                llm_parsed = None
 
             # The stream_response helper doesn't know about TutorTurn schema;
             # synthesize a turn from the accumulated text so downstream code
@@ -273,6 +309,16 @@ class VoiceAgentHarness:
             # could overlap them with continued streaming of the next sentence,
             # but in practice the LLM has finished by the time we get here.
             voice_profile = self.tutor._voice_for_turn(turn)
+
+            # Per-turn recording: capture TTS timing + audio bytes for the
+            # session log. Anomaly flags let us find "stuck" or "no-audio"
+            # turns in post-mortem.
+            tts_sentences_log: list[str] = []
+            tts_latencies_ms: list[int] = []
+            tts_bytes_log: list[int] = []
+            turn_flags: list[str] = []
+            display_text_first = ""
+
             for i, sentence in enumerate(sentences):
                 # Display: pinyin for Mandarin, raw text for English.
                 display_text = sentence
@@ -280,6 +326,8 @@ class VoiceAgentHarness:
                     py = to_pinyin(sentence)
                     if py and py != sentence:
                         display_text = py
+                if i == 0:
+                    display_text_first = display_text
                 self._log(
                     f"tutor [{turn.type} #{i+1}/{len(sentences)}]: {display_text[:80]!r}"
                     f"{'...' if len(display_text) > 80 else ''}",
@@ -296,7 +344,19 @@ class VoiceAgentHarness:
 
                 speed = self.tutor._speed_for_turn(turn)
                 t1 = time.monotonic()
-                result = self.tutor.speak(sentence, voice_profile, speed=speed)
+                try:
+                    result = self.tutor.speak(sentence, voice_profile, speed=speed)
+                except Exception as tts_err:
+                    turn_flags.append(f"tts_error:{type(tts_err).__name__}")
+                    self._log(f"tts error: {tts_err!r}", level="error")
+                    continue
+                tts_latency_ms = int((time.monotonic() - t1) * 1000)
+                tts_sentences_log.append(sentence)
+                tts_latencies_ms.append(tts_latency_ms)
+                tts_bytes_log.append(len(result.audio_bytes))
+
+                if len(result.audio_bytes) == 0:
+                    turn_flags.append("tts_empty_audio")
                 self._log(
                     f"🔊 playing {len(result.audio_bytes)}b @ {result.sample_rate}Hz speed={speed}x",
                 )
@@ -308,9 +368,37 @@ class VoiceAgentHarness:
                     self.event_bus.publish(
                         TtsDoneEvent(
                             ts=time.monotonic(),
-                            duration_ms=int((time.monotonic() - t1) * 1000),
+                            duration_ms=tts_latency_ms,
                         )
                     )
+
+            # Flag anomalies.
+            if not sentences:
+                turn_flags.append("no_sentences_emitted")
+            if not full_text.strip():
+                turn_flags.append("empty_llm_response")
+
+            # Write this turn to the session recorder (best-effort).
+            try:
+                self._recorder.record_turn(
+                    Turn(
+                        ts=time.time(),
+                        seq=self._recorder_seq,
+                        asr_text=text,
+                        asr_language=asr_language,
+                        llm_response=full_text,
+                        llm_parsed_json=llm_parsed,
+                        llm_latency_ms=llm_ms,
+                        tts_sentences=tts_sentences_log,
+                        tts_latency_ms_per_sentence=tts_latencies_ms,
+                        tts_total_bytes=tts_bytes_log,
+                        pinyin_displayed=display_text_first,
+                        flags=turn_flags,
+                    )
+                )
+                self._recorder_seq += 1
+            except Exception as rec_err:
+                self._log(f"recorder error: {rec_err!r}", level="warn")
 
             self._log("listening...")
 
