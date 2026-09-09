@@ -23,7 +23,7 @@ from ..hud.events import (
     TtsDoneEvent,
     LogEvent,
 )
-from ..tutor import to_pinyin
+from ..tutor import TutorTurn, to_pinyin
 from .router import TurnRouter
 from .vad import VoiceActivityDetector
 
@@ -203,7 +203,11 @@ class VoiceAgentHarness:
             raise
 
     async def _process_transcript(self, segments: list[dict]) -> None:
-        """Process a final transcript through the tutor.
+        """Process a final transcript through the tutor (streaming LLM).
+
+        Streams the LLM response and fires TTS as soon as the first sentence
+        boundary arrives, reducing perceived latency from (LLM + TTS) to
+        (~LLM_TTFB + TTS_one_sentence).
 
         Parameters
         ----------
@@ -215,8 +219,8 @@ class VoiceAgentHarness:
             routed = self._router.route(segments)
             text = routed.full_text
 
-            # Determine turn type from routing
-            turn_type = routed.type
+            # Persist user turn to memory (mirror _ask_llm behavior).
+            self.tutor.memory.add_turn("user", text)
 
             # Publish LLM start event
             if self.event_bus:
@@ -224,60 +228,82 @@ class VoiceAgentHarness:
                     LlmStartEvent(ts=time.monotonic(), prompt_chars=len(text))
                 )
 
+            # Stream LLM in a thread so we can fire TTS as soon as a sentence
+            # boundary is detected without blocking the event loop.
+            loop = asyncio.get_running_loop()
             t0 = time.monotonic()
-            turn = self.tutor._ask_llm(text)
+            full_text, sentences = await loop.run_in_executor(
+                None,
+                lambda: self.tutor.stream_response(
+                    self.tutor.memory.get_conversation_for_llm(),
+                ),
+            )
+            llm_ms = int((time.monotonic() - t0) * 1000)
+
+            # Persist assistant response to memory.
+            if full_text.strip():
+                self.tutor.memory.add_turn("assistant", full_text)
+
+            # The stream_response helper doesn't know about TutorTurn schema;
+            # synthesize a turn from the accumulated text so downstream code
+            # doesn't change.
+            turn = TutorTurn(type="explanation", text=full_text)
 
             # Publish LLM done event
             if self.event_bus:
                 self.event_bus.publish(
                     LlmDoneEvent(
                         ts=time.monotonic(),
-                        response_chars=len(turn.text),
-                        duration_ms=int((time.monotonic() - t0) * 1000),
+                        response_chars=len(full_text),
+                        duration_ms=llm_ms,
                     )
                 )
 
             logger.info(
-                "Tutor response: type=%s, text=%s",
-                turn.type,
-                turn.text[:100] if turn.text else "",
+                "Tutor response: %d sentences, %d chars",
+                len(sentences),
+                len(full_text),
             )
 
-            # Synthesize and play TTS response (blocking fallback)
-            if turn.text:
-                voice_profile = self.tutor._voice_for_turn(turn)
+            if not full_text.strip():
+                self._log("listening...")
+                return
 
-                # Publish TTS start event
+            # Speak each sentence in order. VoiceStudio TTS is blocking; we
+            # could overlap them with continued streaming of the next sentence,
+            # but in practice the LLM has finished by the time we get here.
+            voice_profile = self.tutor._voice_for_turn(turn)
+            for i, sentence in enumerate(sentences):
+                # Display: pinyin for Mandarin, raw text for English.
+                display_text = sentence
+                if turn.type != "explanation":
+                    py = to_pinyin(sentence)
+                    if py and py != sentence:
+                        display_text = py
+                self._log(
+                    f"tutor [{turn.type} #{i+1}/{len(sentences)}]: {display_text[:80]!r}"
+                    f"{'...' if len(display_text) > 80 else ''}",
+                )
+
                 if self.event_bus:
                     self.event_bus.publish(
                         TtsStartEvent(
                             ts=time.monotonic(),
-                            text_chars=len(turn.text),
+                            text_chars=len(sentence),
                             voice=voice_profile,
                         )
                     )
 
-                # For Mandarin turns, show pinyin in HUD (more readable for beginners).
-                # For English turns, show the text directly.
-                display_text = turn.text
-                if turn.type != "explanation":
-                    pinyin = to_pinyin(turn.text)
-                    if pinyin and pinyin != turn.text:
-                        display_text = pinyin
-                self._log(f"tutor [{turn.type}]: {display_text[:80]!r}{'...' if len(display_text) > 80 else ''}")
                 speed = self.tutor._speed_for_turn(turn)
-                result = self.tutor.speak(turn.text, voice_profile, speed=speed)
-                # result.audio_bytes is raw PCM int16 LE; sample rate is in result.sample_rate
-                # (VoiceStudio TTS returns 24kHz PCM)
+                t1 = time.monotonic()
+                result = self.tutor.speak(sentence, voice_profile, speed=speed)
                 self._log(
                     f"🔊 playing {len(result.audio_bytes)}b @ {result.sample_rate}Hz speed={speed}x",
                 )
-                t1 = time.monotonic()
                 audio_arr = np.frombuffer(result.audio_bytes, dtype=np.int16)
                 sd.play(audio_arr, samplerate=result.sample_rate)
-                sd.wait()  # Ensure playback completes before continuing
+                sd.wait()
 
-                # Publish TTS done event
                 if self.event_bus:
                     self.event_bus.publish(
                         TtsDoneEvent(
@@ -286,7 +312,7 @@ class VoiceAgentHarness:
                         )
                     )
 
-                self._log("listening...")
+            self._log("listening...")
 
         except Exception as e:
             logger.error("Error processing transcript: %s", e)
