@@ -140,16 +140,7 @@ class LogEvent(Event):
     message: str = ""
 
 
-# Make sure kind is set correctly on each subclass.
-for _cls in (RmsEvent, AsrPartialEvent, AsrFinalEvent,
-             LlmStartEvent, LlmDoneEvent, TtsStartEvent,
-             TtsDoneEvent, VadEvent, LogEvent):
-    _cls.kind = _cls.__name__.replace("Event", "").lower()
-del _cls
-```
-
-Wait — `kind` field collides with the class attribute trick. Use a `__post_init__` per class:
-
+# Make sure kind is set correctly on each subclass — use __post_init__:
 ```python
 @dataclass
 class RmsEvent(Event):
@@ -160,7 +151,7 @@ class RmsEvent(Event):
         self.kind = "rms"
 ```
 
-Apply the same pattern to every event class. Drop the loop hack.
+Apply the same `__post_init__` pattern (setting `self.kind = "<lowercase-name>"`) to every event class. No class-attribute loop hack.
 
 **Step 4 — Run, verify pass**
 
