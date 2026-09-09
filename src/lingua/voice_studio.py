@@ -14,6 +14,7 @@ class TranscriptResult:
 class SynthesisResult:
     audio_bytes: bytes
     duration_ms: int
+    sample_rate: int = 24000  # VoiceStudio PCM is 24kHz int16 LE
 
 
 async def stream_synthesize(
@@ -60,6 +61,10 @@ class VoiceStudioClient:
         Uses the OpenAI-compatible /v1/audio/speech endpoint.
         profile_id can be a voice profile UUID (e.g. "8c53222c") or an
         OpenAI voice alias like "alloy".
+
+        Returns SynthesisResult with raw PCM int16 LE bytes. For PCM format,
+        sample rate is 24000 Hz (server-side default for VoiceStudio). Callers
+        should pass `sample_rate` to their audio backend.
         """
         payload = {
             "input": text,
@@ -74,7 +79,9 @@ class VoiceStudioClient:
             timeout=30,
         )
         resp.raise_for_status()
-        return SynthesisResult(audio_bytes=resp.content, duration_ms=0)
+        # VoiceStudio TTS PCM is 24kHz int16 LE (confirmed via WAV header inspection).
+        sample_rate = 24000 if response_format == "pcm" else 24000
+        return SynthesisResult(audio_bytes=resp.content, duration_ms=0, sample_rate=sample_rate)
 
     async def stream_synthesize(
         self,
