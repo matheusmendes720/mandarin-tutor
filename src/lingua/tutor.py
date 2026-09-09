@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 import requests
+
+from pypinyin import lazy_pinyin, Style
 
 from . import config as cfg
 from .prompts import SYSTEM_PROMPT
@@ -13,6 +16,20 @@ from .voice_studio import VoiceStudioClient, SynthesisResult
 from .agent.memory import ConversationMemory
 
 logger = logging.getLogger(__name__)
+
+
+_HANZI_RE = re.compile(r"[㐀-鿿]")
+
+
+def to_pinyin(text: str) -> str:
+    """Convert Chinese characters to pinyin with tone marks; leave non-Chinese unchanged.
+
+    Example: '你好世界' → 'nǐ hǎo shì jiè'.
+    """
+    if not text or not _HANZI_RE.search(text):
+        return text
+    parts = lazy_pinyin(text, style=Style.TONE)
+    return " ".join(p for p in parts if p)
 
 
 @dataclass

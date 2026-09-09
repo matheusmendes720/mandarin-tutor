@@ -23,6 +23,7 @@ from ..hud.events import (
     TtsDoneEvent,
     LogEvent,
 )
+from ..tutor import to_pinyin
 from .router import TurnRouter
 from .vad import VoiceActivityDetector
 
@@ -256,7 +257,14 @@ class VoiceAgentHarness:
                         )
                     )
 
-                self._log(f"tutor: {turn.text[:80]!r}{'...' if len(turn.text) > 80 else ''}")
+                # For Mandarin turns, show pinyin in HUD (more readable for beginners).
+                # For English turns, show the text directly.
+                display_text = turn.text
+                if turn.type != "explanation":
+                    pinyin = to_pinyin(turn.text)
+                    if pinyin and pinyin != turn.text:
+                        display_text = pinyin
+                self._log(f"tutor [{turn.type}]: {display_text[:80]!r}{'...' if len(display_text) > 80 else ''}")
                 speed = self.tutor._speed_for_turn(turn)
                 result = self.tutor.speak(turn.text, voice_profile, speed=speed)
                 # result.audio_bytes is raw PCM int16 LE; sample rate is in result.sample_rate
