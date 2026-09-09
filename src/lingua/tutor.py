@@ -181,6 +181,32 @@ class MandarinTutor:
                     else:
                         on_sentence(tail_sentence, full_text)
 
+        # If the LLM returned a JSON object, the text field may itself contain
+        # sentence-ending punctuation. Don't split on JSON syntax characters.
+        # Try to parse and, if successful, re-extract sentences from the "text"
+        # field only.
+        try:
+            obj = json.loads(full_text)
+            text_field = obj.get("text", "")
+            if text_field:
+                # Split text_field on sentence boundaries; replace sentences.
+                cleaned = []
+                cursor = 0
+                while cursor < len(text_field):
+                    result = find_sentence_boundary(text_field, cursor)
+                    if result is None:
+                        rest = text_field[cursor:].strip()
+                        if rest:
+                            cleaned.append(rest)
+                        break
+                    delim_end, sentence = result
+                    if sentence.strip():
+                        cleaned.append(sentence)
+                    cursor = delim_end
+                sentences = cleaned
+        except (json.JSONDecodeError, TypeError):
+            pass  # not JSON, keep raw sentence split
+
         return full_text, sentences
 
     def _ask_llm(self, user_message: str) -> TutorTurn:
