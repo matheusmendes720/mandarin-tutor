@@ -74,18 +74,21 @@ class Hud:
 
     def renderable(self) -> Layout:
         layout = Layout()
+        # Header (3) + body (transcript-led) + log (12, roomier for rolling events)
         layout.split_column(
             Layout(self._header(), size=3),
             Layout(name="body"),
-            Layout(self._log_panel(), size=8),
+            Layout(self._log_panel(), size=12),
         )
+        # Body: left rail (mic + pipeline, fixed-size) + right (transcript fills the rest)
         layout["body"].split_row(
-            Layout(name="left"),
+            Layout(name="left", size=42),
             Layout(self._transcript_panel(), name="right"),
         )
+        # Mic (7 rows) + Pipeline (8 rows) — exact sizes, no empty padding
         layout["body"]["left"].split_column(
-            Layout(self._mic_panel(), name="mic"),
-            Layout(self._pipeline_panel(), name="pipeline"),
+            Layout(self._mic_panel(), name="mic", size=7),
+            Layout(self._pipeline_panel(), name="pipeline", size=8),
         )
         return layout
 
@@ -101,33 +104,66 @@ class Hud:
         return Panel(text, border_style="cyan")
 
     def _mic_panel(self) -> Panel:
-        # Render RMS bar as 30 chars wide
-        bar_width = 30
+        # Wider bar (40 chars) so RMS movement is visible at a glance.
+        # Use ratio of last_rms vs the typical noise floor (0.05) for "speech" color.
+        bar_width = 40
         rms_now = self.last_speech_rms
-        filled = int(min(rms_now, 1.0) * bar_width)
-        bar = "=" * filled + "-" * (bar_width - filled)
-        threshold_pos = int(0.05 * bar_width)
-        bar_text = Text()
-        bar_text.append(bar[:threshold_pos], style="green")
-        bar_text.append(bar[threshold_pos], style="yellow")
-        bar_text.append(bar[threshold_pos+1:], style="dim")
-        state_color = {"silence": "dim", "speech": "bold red", "turn_end": "yellow"}.get(self.vad_state, "white")
-        bar_text.append(f"\nrms: {rms_now:.3f}  threshold: 0.05\n", style="dim")
-        bar_text.append(f"VAD: {self.vad_state.upper()}", style=state_color)
-        return Panel(bar_text, title="MICROPHONE", border_style="green")
+        # Cap display at 0.5 RMS — anything above that is "loud"
+        display_rms = min(rms_now, 0.5) / 0.5
+        filled = int(display_rms * bar_width)
+        threshold_pos = int(0.05 / 0.5 * bar_width)  # threshold marker
+        bar_chars = "█" * filled + "░" * (bar_width - filled)
+        state_color = {
+            "silence": "dim",
+            "speech": "bold red",
+            "turn_end": "yellow",
+        }.get(self.vad_state, "white")
+        # Build line by line — no padding rows
+        bar_line = Text()
+        bar_line.append(bar_chars[:threshold_pos], style="green")
+        bar_line.append(bar_chars[threshold_pos], style="yellow")
+        bar_line.append(bar_chars[threshold_pos + 1:], style="dim")
+        info_line = Text()
+        info_line.append(f"rms {rms_now:.3f}", style="dim")
+        info_line.append("  thr 0.050  ", style="dim")
+        info_line.append(f"VAD {self.vad_state.upper()}", style=state_color)
+        # Compose into a single Text with embedded newline
+        body = Text()
+        body.append_text(bar_line)
+        body.append("\n")
+        body.append_text(info_line)
+        body.append("\n")
+        # Line 3: hint about voice profile
+        body.append("input → pipeline", style="dim italic")
+        return Panel(body, title="MICROPHONE", border_style="green")
 
     def _pipeline_panel(self) -> Panel:
+        # 3 status rows + summary row at bottom = 4 useful lines + padding
         text = Text()
         for name, status, lat in (
-            ("ASR ", self.asr_status, self.asr_latency_ms),
-            ("LLM ", self.llm_status, self.llm_latency_ms),
-            ("TTS ", self.tts_status, self.tts_latency_ms),
+            ("ASR", self.asr_status, self.asr_latency_ms),
+            ("LLM", self.llm_status, self.llm_latency_ms),
+            ("TTS", self.tts_status, self.tts_latency_ms),
         ):
-            icon = {"idle": "o", "thinking": "...", "playing": ">", "final": "v", "done": "v"}.get(status, "?")
-            color = {"idle": "dim", "thinking": "yellow", "playing": "cyan", "final": "green", "done": "green"}.get(status, "white")
-            text.append(f"{icon} {name}", style=color)
-            text.append(f"  {status:<10}", style=color)
-            text.append(f" {lat}ms\n", style="dim")
+            icon = {"idle": "○", "thinking": "⋯", "playing": "▶", "final": "✓", "done": "✓"}.get(status, "?")
+            color = {
+                "idle": "dim",
+                "thinking": "yellow",
+                "playing": "cyan",
+                "final": "green",
+                "done": "green",
+            }.get(status, "white")
+            # Pad status label to 8 chars so columns line up
+            text.append(f"{icon} {name:<4}", style=color)
+            text.append(f"  {status:<8}", style=color)
+            text.append(f" {lat:>5}ms\n", style="dim")
+        # Summary: total turn latency
+        total = (self.asr_latency_ms or 0) + (self.llm_latency_ms or 0) + (self.tts_latency_ms or 0)
+        text.append("\n")
+        text.append("─" * 36, style="dim")
+        text.append("\n")
+        text.append(f"total ", style="dim")
+        text.append(f"{total}ms", style="bold")
         return Panel(text, title="PIPELINE", border_style="magenta")
 
     def _transcript_panel(self) -> Panel:
