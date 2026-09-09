@@ -145,8 +145,16 @@ class Hud:
         return Panel(text, title="LOG (rolling)", border_style="dim")
 
     async def run(self, events) -> None:
-        """Consume events from an async iterator and live-render."""
+        """Consume events from an asyncio.Queue (or async iterable) and live-render."""
         with Live(self.renderable(), console=self.console, refresh_per_second=10) as live:
-            async for event in events:
+            while True:
+                # Support both asyncio.Queue and async iterables
+                if hasattr(events, "get"):
+                    event = await events.get()
+                else:
+                    try:
+                        event = await events.__anext__()
+                    except StopAsyncIteration:
+                        return
                 self.apply(event)
                 live.update(self.renderable())

@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 import sounddevice as sd
+from rich.console import Console
 
 from .config import LinguaConfig
 from .voice_studio import VoiceStudioClient
@@ -73,7 +74,12 @@ async def async_main(args: argparse.Namespace) -> None:
     tutor = MandarinTutor(config)
     harness = VoiceAgentHarness(tutor=tutor, config=config, event_bus=bus)
 
-    hud = Hud(input_device=input_name, output_device=output_name)
+    # Detect if stdout is a real TTY (interactive) or a pipe (capture). Rich needs
+    # to know so it doesn't emit escape codes when redirected.
+    import sys
+    is_tty = sys.stdout.isatty()
+    console = Console(force_terminal=is_tty, no_color=not is_tty) if is_tty else None
+    hud = Hud(input_device=input_name, output_device=output_name, console=console)
 
     print("🎙️  Lingua Voice Tutor")
     print(f"Input:  {input_name} [device {input_idx}]")
