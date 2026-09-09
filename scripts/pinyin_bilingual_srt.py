@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 try:
-    from deep_translator import GoogleTranslator, MyMemoryTranslator
+    from deep_translator import GoogleTranslator
 except ImportError:
     sys.stderr.write("Error: deep_translator not installed.\n    pip install deep_translator\n")
     sys.exit(1)
@@ -67,46 +67,37 @@ def translate_batch(texts: list[str]) -> list[str]:
     """Translate English texts to Chinese Simplified via Google Translate.
 
     Handles rate limiting with retries and exponential backoff.
-    Falls back to MyMemory if Google fails persistently.
     """
     results = []
     errors = {}
 
-    # Try Google first, fall back to MyMemory
-    google_ok = False
-    try:
-        translator = GoogleTranslator(source="en", target="zh-CN")
-        test = translator.translate("test")
-        google_ok = True
-    except Exception:
-        pass
+    translator = GoogleTranslator(source="en", target="zh-CN")
 
     for i, text in enumerate(texts):
         raw = None
         attempts = 0
-        max_attempts = 5 if google_ok else 3
+        max_attempts = 5
 
         while attempts < max_attempts:
             attempts += 1
             try:
-                if google_ok:
-                    raw = translator.translate(text)
-                else:
-                    # Fallback to MyMemory
-                    mymem = MyMemoryTranslator(source="english", target="chinese simplified")
-                    raw = mymem.translate(text)
-                break
+                raw = translator.translate(text)
+                if raw and raw != text:
+                    break
+                # Empty result: treat as no translation, retry
+                err_str = "Empty translation result"
+                raise Exception(err_str)
             except Exception as e:
                 err_str = str(e)
                 if attempts == 1:
                     errors[i] = err_str
-                # Rate limit: wait longer
-                wait = min(2 ** attempts + 0.5, 30)
+                # Rate limit: wait much longer with exponential backoff
+                wait = min(2 ** attempts * 2 + 1, 120)
                 sys.stderr.write(f"\n  [attempt {attempts}/{max_attempts}] {err_str[:60]} — waiting {wait:.1f}s...")
                 sys.stderr.flush()
                 time.sleep(wait)
 
-        if raw:
+        if raw and raw != text:
             results.append(raw)
         else:
             results.append(f"[ERR: {errors.get(i, 'translation failed')}]")

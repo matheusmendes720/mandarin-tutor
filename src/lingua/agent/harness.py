@@ -68,30 +68,36 @@ class VoiceAgentHarness:
 
         Concurrently captures audio and transcribes it. When a final
         transcript with non-empty text is received, passes it to the
-        tutor for processing.
+        tutor for processing. Loops continuously so the user can have
+        multiple back-and-forth turns.
         """
-        # Create a queue for passing audio chunks from capture to ASR
-        audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
+        while True:
+            print("   [listening...]")
+            # Create a queue for passing audio chunks from capture to ASR
+            audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
 
-        # Create tasks for concurrent execution
-        capture_task = asyncio.create_task(
-            self._capture_audio(audio_queue)
-        )
-        asr_task = asyncio.create_task(
-            self._transcribe_audio(audio_queue)
-        )
+            # Create tasks for concurrent execution
+            capture_task = asyncio.create_task(
+                self._capture_audio(audio_queue)
+            )
+            asr_task = asyncio.create_task(
+                self._transcribe_audio(audio_queue)
+            )
 
-        try:
-            # Run both tasks concurrently
-            await asyncio.gather(capture_task, asr_task)
-        except asyncio.CancelledError:
-            logger.info("VoiceAgentHarness cancelled, cleaning up tasks...")
-            # Cancel both tasks
-            capture_task.cancel()
-            asr_task.cancel()
-            # Wait for both to complete cancellation
-            await asyncio.gather(capture_task, asr_task, return_exceptions=True)
-            raise
+            try:
+                # Run both tasks concurrently until one finishes
+                await asyncio.gather(capture_task, asr_task)
+            except asyncio.CancelledError:
+                logger.info("VoiceAgentHarness cancelled, cleaning up tasks...")
+                capture_task.cancel()
+                asr_task.cancel()
+                await asyncio.gather(capture_task, asr_task, return_exceptions=True)
+                raise
+            except Exception as e:
+                logger.error("Turn error: %s", e)
+                # Brief pause before next turn to avoid tight error loops
+                await asyncio.sleep(1)
+                continue
 
     async def _capture_audio(self, queue: asyncio.Queue[bytes]) -> None:
         """Capture audio chunks and put them in the queue.
@@ -115,6 +121,7 @@ class VoiceAgentHarness:
             raise
         finally:
             # Signal end of audio
+            print("   [silence detected — processing...]")
             await queue.put(b"")
 
     async def _transcribe_audio(self, queue: asyncio.Queue[bytes]) -> None:
@@ -148,7 +155,7 @@ class VoiceAgentHarness:
                 elif result_type == "partial":
                     logger.debug("ASR partial: %s", text)
                 elif result_type == "final":
-                    logger.info("ASR final transcript: %s", text)
+                    print(f"   [heard: {text!r}]")
                     # Only process non-empty transcripts
                     if text.strip():
                         # Build segments with language detection (default to zh for now)
@@ -189,10 +196,13 @@ class VoiceAgentHarness:
             # Synthesize and play TTS response (blocking fallback)
             if turn.text:
                 voice_profile = self.tutor._voice_for_turn(turn)
+                print(f"   [tutor: {turn.text[:60]!r}{'...' if len(turn.text) > 60 else ''}]")
                 result = self.tutor.speak(turn.text, voice_profile)
                 # Play audio using blocking playback
+                print("   [🔊 playing response...]")
                 sd.play(result.audio_bytes, sample_rate=16000)
                 sd.wait()  # Ensure playback completes before continuing
+                print("   [listening...]")
 
         except Exception as e:
             logger.error("Error processing transcript: %s", e)

@@ -100,10 +100,10 @@ POST /generate
 ### Role
 
 A conversational Mandarin tutor that:
-- Acts as an English-speaking teacher who teaches entirely in Mandarin (immersive, no crutches)
-- Speaks only Mandarin during lessons — the English persona explains context in Mandarin only
-- Detects when the user makes tone errors and triggers targeted drill
-- Detects when vocab is misused and drills it
+- Acts as an English-speaking teacher — explains concepts, corrections, and instructions **in English**
+- Drills vocabulary and tone practice **in Mandarin** (immersive target language)
+- Detects when the user makes tone errors and triggers targeted tone drill
+- Detects when vocab is misused and drills it in Mandarin
 - Builds sentences using only words the user already knows
 - Adapts difficulty based on FSRS card performance
 
