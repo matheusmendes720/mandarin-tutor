@@ -69,7 +69,7 @@ class TestStreamTranscribe:
         """Verify final transcript is yielded from WebSocket."""
         messages = [
             '{"type": "session.started"}',
-            '{"final": {"text": "Hello world"}}',
+            '{"type": "final", "text": "Hello world"}',
         ]
         mock_ws = MockWebSocket(messages)
 
@@ -101,9 +101,9 @@ class TestStreamTranscribe:
         """Verify partial results are yielded."""
         messages = [
             '{"type": "session.started"}',
-            '{"partial": {"text": "Hel"}}',
-            '{"partial": {"text": "Hello"}}',
-            '{"final": {"text": "Hello world"}}',
+            '{"type": "partial", "text": "Hel"}',
+            '{"type": "partial", "text": "Hello"}',
+            '{"type": "final", "text": "Hello world"}',
         ]
         mock_ws = MockWebSocket(messages)
 
@@ -133,7 +133,7 @@ class TestStreamTranscribe:
         """Verify errors are yielded properly."""
         messages = [
             '{"type": "session.started"}',
-            '{"error": {"message": "Connection failed"}}',
+            '{"type": "error", "message": "Connection failed"}',
         ]
         mock_ws = MockWebSocket(messages)
 
@@ -175,7 +175,7 @@ class TestStreamTranscribe:
         """Verify input_audio.end is sent after chunks complete."""
         messages = [
             '{"type": "session.started"}',
-            '{"final": {"text": "Test"}}',
+            '{"type": "final", "text": "Test"}',
         ]
         mock_ws = MockWebSocket(messages)
 
