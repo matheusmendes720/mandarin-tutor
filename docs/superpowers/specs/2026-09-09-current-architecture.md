@@ -86,6 +86,53 @@ Driven by `EventBus` (thread-safe pub/sub) populated by harness events. `apply(e
 ## Module dependency map
 
 ```
+                          ┌──────────────────────────────────────────────────┐
+                          │                  __main__.py                    │
+                          │       (CLI args, env load, VoiceStudio check)   │
+                          └──────────────────────┬───────────────────────┘
+                                                 │
+                                                 ▼
+                          ┌──────────────────────────────────────────────────┐
+                          │           VoiceAgentHarness  (harness.py)        │
+                          │  - run() loop                                    │
+                          │  - _capture_audio / _transcribe_audio /          │
+                          │    _process_transcript                            │
+                          └─┬───────┬───────┬───────┬───────┬───────┬─────┬─┘
+                            │       │       │       │       │       │     │
+                            ▼       ▼       ▼       ▼       ▼       ▼     ▼
+                       ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐
+                       │Tutor│ │ASR  │ │VAD  │ │Rout.│ │Audio│ │Hud+ │ │Rec. │
+                       │     │ │     │ │     │ │     │ │Loop │ │Bus  │ │     │
+                       └──┬──┘ └──┬──┘ └─────┘ └─────┘ └──┬──┘ └──┬──┘ └──┬──┘
+                          │       │                    │       │       │
+              ┌───────────┼───────┼────────────┐       │       │       │
+              │           │       │            │       │       │       │
+              ▼           ▼       │            │       │       │       │
+       ┌─────────────┐ ┌─────────┴──┐         │       │       │       │
+       │ VoiceStudio │ │PcmToOpus  │         │       │       │       │
+       │ Client      │ │Encoder    │         │       │       │       │
+       │ (TTS API)   │ │           │         │       │       │       │
+       └─────────────┘ └────────────┘         │       │       │       │
+              │           │                  │       │       │       │
+              ▼           ▼                  ▼       ▼       ▼       ▼
+       ┌──────────────────────────────────────────────────────────────┐
+       │                     VoiceStudio server                       │
+       │                 http://127.0.0.1:3900                        │
+       │    /v1/audio/transcriptions/stream  (WebSocket ASR)         │
+       │    /v1/audio/speech                  (POST TTS)              │
+       └──────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+       ┌──────────────────────────────────────────────────────────────┐
+       │                    MiniMax LLM API                           │
+       │           https://api.minimax.io/v1/text                     │
+       │                  model: MiniMax-M3                           │
+       └──────────────────────────────────────────────────────────────┘
+```
+
+### Detailed import graph
+
+```
 __main__.py
   └── VoiceAgentHarness  (agent/harness.py)
         ├── MandarinTutor (tutor.py)

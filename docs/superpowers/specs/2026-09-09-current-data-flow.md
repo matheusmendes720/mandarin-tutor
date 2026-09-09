@@ -7,7 +7,44 @@ LLM response: *"That isn't Mandarin. The phrase is: tā měitiān qù xuéxiào 
 
 ## Step-by-step
 
-### 1. Audio capture (16kHz, ~5KB chunks)
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                            ONE TURN FLOW                                       │
+│                                                                              │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   │
+│  │ 1. Audio │   │ 2. WebM  │   │ 3. WS    │   │ 4. Voice │   │ 5. ASR   │   │
+│  │ capture  │──▶│ encode   │──▶│ buffered │──▶│ Studio   │──▶│ event    │   │
+│  │ (44→16k) │   │ (libopus)│   │ send     │   │ faster-  │   │ publish  │   │
+│  │  ~5KB     │   │ partial  │   │ ≥8KB     │   │ whisper  │   │          │   │
+│  └──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘   │
+│                                                                   │          │
+│                                                                   ▼          │
+│  ┌─────────────────────────────────────────────────────────────────────┐     │
+│  │ 6. HUD renders ASR                                                  │     │
+│  │  transcript panel + log panel                                       │     │
+│  └─────────────────────────────────────────────────────────────────────┘     │
+│                                                                   │          │
+│                                                                   ▼          │
+│  ┌─────────────────────────────────────────────────────────────────────┐     │
+│  │ 7. LLM call (streaming)                                            │     │
+│  │  POST minimax.io/v1/text/chatcompletion_v2 (stream=true)           │     │
+│  │  SSE → accumulate → split sentences → parse JSON if possible       │     │
+│  └─────────────────────────────────────────────────────────────────────┘     │
+│                                                                   │          │
+│                                                                   ▼          │
+│  ┌──────────┐   ┌──────────┐   ┌─────────────────────────────────────┐       │
+│  │ 9. TTS   │   │ 9. sd.   │   │ 10. TutorDoneEvent + recorder      │       │
+│  │ per sent.│──▶│ wait()   │──▶│ (HUD log + JSON file)              │       │
+│  │ (24kHz)  │   │ BLOCKING │   │                                    │       │
+│  └──────────┘   └──────────┘   └─────────────────────────────────────┘       │
+│                                                                   │          │
+└───────────────────────────────────────────────────────────────────────────┘     │
+                                                                   │          │
+                                                                   ▼          │
+                                                            back to step 1 ┘
+```
+
+### Step 1: Audio capture (16kHz, ~5KB chunks)
 **Code:** `src/lingua/audio_loop.py:stream_audio_chunks`
 
 ```
@@ -19,7 +56,7 @@ LLM response: *"That isn't Mandarin. The phrase is: tā měitiān qù xuéxiào 
 
 **Observed:** 16 chunks captured per 2.5s of silence (idle state).
 
-### 2. WebM encoding (PyAV)
+### Step 2: WebM encoding (PyAV)
 **Code:** `src/lingua/asr.py:PcmToOpusEncoder`
 
 ```
@@ -31,7 +68,7 @@ LLM response: *"That isn't Mandarin. The phrase is: tā měitiān qù xuéxiào 
 
 **Critical:** output is **partial WebM**. First chunks are header-only (460 bytes). Server fails EBML parsing.
 
-### 3. Buffered WebSocket send
+### Step 3: Buffered WebSocket send
 **Code:** `src/lingua/asr.py:stream_transcribe`
 
 ```
@@ -41,7 +78,7 @@ send as single message to ws://127.0.0.1:3900/v1/audio/transcriptions/stream?sr=
 
 **Why the buffer:** server saves what it receives as `.webm`. Partial WebM (header only) fails decoding. Buffering ensures every send is a complete container.
 
-### 4. VoiceStudio ASR (faster-whisper)
+### Step 4: VoiceStudio ASR (faster-whisper)
 **Code:** server-side, not in our repo
 
 ```
@@ -55,7 +92,7 @@ sends JSON over WebSocket: {"type": "final", "text": "...", ...}
 
 **Latency:** 0.5-2s per turn (depends on GPU load + audio length).
 
-### 5. ASR event published
+### Step 5: ASR event published
 **Code:** `src/lingua/agent/harness.py:_transcribe_audio`
 
 ```python
@@ -69,7 +106,7 @@ elif result_type == "final":
 
 **Bug:** `language` from ASR is dropped, segments hardcoded to `"zh"`.
 
-### 6. HUD renders ASR
+### Step 6: HUD renders ASR
 **Code:** `src/lingua/hud/display.py:Hud.apply`
 
 ```
@@ -78,7 +115,7 @@ AsrFinalEvent → appends to deque(maxlen=6) → transcript panel
 Live display redraws 10×/sec
 ```
 
-### 7. LLM call (streaming)
+### Step 7: LLM call (streaming)
 **Code:** `src/lingua/agent/harness.py:_process_transcript`
 
 ```
@@ -115,40 +152,59 @@ return full_text, sentences
 
 **Observed:** for this turn, `full_text` is the JSON object, `sentences` is `['', ' "type":"explanation","text":"That isn\'t Mandarin.', ' The phrase is: tā měitiān qù xuéxiào — \'She/He goes to school every day.', "'"]` — broken on commas because the JSON was the *raw text*, not the extracted `text` field.
 
-### 8. LlmDoneEvent published
+### Step 8: LlmDoneEvent published
 ```python
 self.event_bus.publish(LlmDoneEvent(ts=..., response_chars=..., duration_ms=llm_ms))
 ```
 
-### 9. TTS per sentence
+### Step 9: TTS per sentence
 **Code:** `src/lingua/agent/harness.py:_process_transcript`
 
 For each sentence in `sentences`:
 
-```python
-speed = tutor._speed_for_turn(turn)  # 0.75 for Mandarin, 1.0 for explanation
-result = tutor.speak(sentence, voice_profile, speed=speed)
-# result.audio_bytes = PCM int16 LE 24kHz
-# result.sample_rate = 24000
-
-audio_arr = np.frombuffer(result.audio_bytes, dtype=np.int16)
-sd.play(audio_arr, samplerate=result.sample_rate)
-sd.wait()  # ← BLOCKS the event loop for the entire audio duration
+```
+sentence ──▶ tutor.speak(sentence, voice, speed)
+                │
+                ▼
+            HTTP POST /v1/audio/speech (PCM 24kHz)
+                │
+                ▼
+            audio_bytes: ~80-180KB per sentence
+                │
+                ▼
+            sd.play(np.frombuffer(audio, int16), samplerate=24000)
+                │
+                ▼
+            sd.wait()  ◀── BLOCKS the event loop
 ```
 
 **Latency per sentence:** ~1-2s for typical short sentence.
 
 **Critical:** `sd.wait()` is blocking. While the tutor speaks, no user input can be detected.
 
-### 10. TutorDoneEvent + recorder writes
+### Step 10: TutorDoneEvent + recorder writes
 ```python
 TtsDoneEvent → EventBus → HUD log
 Turn(...) → SessionRecorder → data/sessions/session_*.json
 ```
 
-### 11. Loop back to step 1
+### Step 11: Loop back to step 1
 
 ## Timing for one turn
+
+```
+   t=0s      t=2s        t=4s       t=6s       t=8s       t=10s
+    │         │           │          │          │          │
+    ▼         ▼           ▼          ▼          ▼          ▼
+    ┌─────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐
+    │audio    │  │  ASR   │  │  LLM   │  │  TTS   │  │sd.wait │
+    │capture  │──▶ 1-2s   │──▶ 2-3.5s│──▶0.8-2s │──▶1-3s  │
+    │1.5s     │  │        │  │ (stream)│  │ per sent│  │(audio) │
+    └─────────┘  └────────┘  └────────┘  └────────┘  └────────┘
+
+   ▲ user speaks                                              ▲ tutor
+   ▲ silence                                                  ▲ done
+```
 
 | Step | Latency |
 |---|---|

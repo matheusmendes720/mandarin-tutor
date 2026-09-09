@@ -4,6 +4,20 @@ Compiled from analysis of `data/sessions/session_20260909_181033.json`, `182249.
 
 ## L1. Quiz loop, not conversation
 
+```
+   USER SAYS                                  LLM RESPONDS
+   ─────────                                   ─────────────
+                                                ┌─────────────────────────┐
+   "another phrase please"        ────────────▶ │  Same drill phrase       │
+   "how do you say thank you"     ────────────▶ │  "nǐ kàn guò nà běn shū  │
+   "Beijo mano" (PT)              ────────────▶ │   ma" (Have you read     │
+   "N'est pas un roi" (FR)        ────────────▶ │   that book?)            │
+   "Washing" (EN)                 ────────────▶ │                         │
+   "Fuck this"                   ────────────▶ │  Every turn, the same    │
+   ...                                       │  expected phrase.        │
+   (8 consecutive turns)                      └─────────────────────────┘
+```
+
 **Symptom:** User says "another phrase please" or "how do you say thank you" or random words → LLM responds with the same drill phrase.
 
 **Evidence (session 181033, turns 12-20):**
@@ -41,6 +55,20 @@ turn 20: asr="Bem quebrado ainda."       expected="nǐ kàn guò nà běn shū m
 
 ## L3. TTS plays filler
 
+```
+   LLM output:       "Sure! That isn't Mandarin. The phrase is: nǐ kàn guò nà běn shū ma."
+                    │     │                   │                       │
+   split on:        .   .                  .                       │
+                    ▼     ▼                   ▼                       ▼
+   TTS calls:      [1]   [2]                 [3]                     [4]
+                   ↓     ↓                   ↓                       ↓
+                   ⚡⚡   ⚡⚡                  ⚡⚡⚡⚡                  ⚡⚡
+                   0.5s   0.5s                 1.2s                    0.4s
+
+   TOTAL TTS time:  2.6s for one short response
+   EXPECTED:        0.5s — just the actual content, no filler
+```
+
 **Symptom:** Tutor says "Sure!" then "That isn't Mandarin." then "Try: nǐ kàn guò nà běn shū ma" — three TTS calls for what should be one thought.
 
 **Evidence (session 181033, turn 11):**
@@ -77,6 +105,23 @@ The `.get(..., "zh")` default is wrong — it should propagate whatever ASR retu
 
 ## L5. No interruption
 
+```
+   t=0s         t=1s         t=2s         t=3s         t=4s
+    │            │            │            │            │
+    ▼            ▼            ▼            ▼            ▼
+    ┌─TUTOR SPEAKING─────────────────────────────────────────┐
+    │  sentence 1  │ sentence 2  │  sentence 3  │  sentence 4│
+    └─────────────┴─────────────┴─────────────┴─────────────┘
+                                                │
+                                       user speaks ─┘
+                                                │
+                                                ✗ mic IGNORED
+                                                ✗ can't stop
+
+   CURRENT BEHAVIOR: user must wait for sentence 4 to finish
+   EXPECTED BEHAVIOR: tutor stops within 1s of user speaking
+```
+
 **Symptom:** While the tutor is speaking (sd.play + sd.wait), the user cannot:
 - Stop playback by speaking
 - Be heard by the mic
@@ -90,6 +135,28 @@ The `.get(..., "zh")` default is wrong — it should propagate whatever ASR retu
 ---
 
 ## L6. LLM context window grows unbounded
+
+```
+   context size sent per LLM call
+
+   tokens
+   4000 ┤                                          ╱──
+        │                                       ╱───
+   3000 ┤                                   ╱───
+        │                               ╱───
+   2000 ┤                           ╱───
+        │                       ╱───       ← LLM confused by stale history
+   1000 ┤                ╱──────              → truncated responses
+        │           ╱────
+      0 ┤────╱────
+        └────┬────┬────┬────┬────┬────┬────
+            5    10   15   20   25   30 turns
+            ↑
+         session start
+
+   CURRENT: every LLM call sends the full 30-turn history
+   EXPECTED: send only [system, last 2 turns, current]
+```
 
 **Symptom:** Long sessions show degraded response quality.
 
@@ -217,17 +284,43 @@ Out of scope for this spec but documented for future work.
 
 ## Summary
 
+```
+SEVERITY DISTRIBUTION
+─────────────────────────────────────────────────────
+HIGH    ███████                                          3
+MEDIUM  ████                                            2
+LOW     ████████                                        4
+DEFER   ████████                                        2
+─────────────────────────────────────────────────────
+```
+
 | # | Symptom | Severity | Spec coverage |
 |---|---|---|---|
-| L1 | Quiz loop | HIGH | conversational-harness §Intent router |
-| L2 | Stuck on phrase | HIGH | §Repetition detection |
+| L1 | Quiz loop | **HIGH** | conversational-harness §Intent router |
+| L2 | Stuck on phrase | **HIGH** | §Repetition detection |
+| L5 | No interruption | **HIGH** | conversational-harness §Interruption |
 | L3 | TTS filler | MEDIUM | §System prompt tightening |
-| L4 | Hardcoded language="zh" | LOW | one-line fix |
-| L5 | No interruption | HIGH | conversational-harness §Interruption |
 | L6 | Context window unbounded | MEDIUM | §Context management |
+| L4 | Hardcoded language="zh" | LOW | one-line fix |
 | L7-L11 | Plumbing/cleanup | LOW | pyproject tweaks |
-| L12 | No progress tracking | — | separate spec |
-| L13-L14 | Missing UX controls | LOW | future work |
 | L15 | Recorder metadata | LOW | one-line fix |
+| L12 | No progress tracking | DEFER | separate spec |
+| L13-L14 | Missing UX controls | DEFER | future work |
 
 The next implementation cycle should address **L1, L2, L5** (the spec's three primary targets) and **L3, L4, L6** as supporting fixes. **L12** (vocabulary progress) needs its own spec — too large for this conversation.
+
+### What changes vs. what stays
+
+```
+┌──────────────────────────────────────┬──────────────────┐
+│   IN SCOPE (this cycle)              │  OUT OF SCOPE      │
+├──────────────────────────────────────┼──────────────────┤
+│   ✓ State machine harness            │  ✗ Vocabulary SRS │
+│   ✓ Intent router                    │  ✗ Web UI         │
+│   ✓ Repetition detection             │  ✗ Multi-user     │
+│   ✓ Interruption                     │  ✗ Local LLM      │
+│   ✓ Context scoping                  │  ✗ Voice auth     │
+│   ✓ Plumb-fix language="zh" bug      │                    │
+│   ✓ Stop TTS filler                  │                    │
+└──────────────────────────────────────┴──────────────────┘
+```
