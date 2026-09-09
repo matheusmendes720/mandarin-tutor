@@ -6,6 +6,8 @@ import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
+import sounddevice as sd
+
 from ..audio_loop import stream_audio_chunks
 from ..asr import stream_transcribe
 from ..tutor import MandarinTutor
@@ -165,5 +167,14 @@ class VoiceAgentHarness:
                 turn.type,
                 turn.text[:100] if turn.text else "",
             )
+
+            # Synthesize and play TTS response (blocking fallback)
+            if turn.text:
+                voice_profile = self.tutor._voice_for_turn(turn)
+                result = self.tutor.speak(turn.text, voice_profile)
+                # Play audio using blocking playback
+                sd.play(result.audio_bytes, sample_rate=16000)
+                sd.wait()  # Ensure playback completes before continuing
+
         except Exception as e:
             logger.error("Error processing transcript: %s", e)

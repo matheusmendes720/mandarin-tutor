@@ -11,6 +11,7 @@ import pytest
 from lingua.audio_loop import stream_audio_chunks
 from lingua.asr import stream_transcribe
 from lingua.tutor import MandarinTutor, TutorTurn
+from lingua.voice_studio import SynthesisResult
 
 
 def create_async_iter(items: list[Any]) -> AsyncIterator[Any]:
@@ -128,3 +129,49 @@ class TestVoiceAgentHarness:
 
         # LLM should not be called for empty transcript
         mock_tutor._ask_llm.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_harness_calls_tts_playback_on_response(self, sample_audio_chunk):
+        """Verify TTS playback is called after LLM returns a response."""
+        from lingua.agent.harness import VoiceAgentHarness
+        from unittest.mock import call
+
+        # Create mock tutor with speak method
+        mock_tutor = MagicMock(spec=MandarinTutor)
+        mock_tutor._ask_llm = MagicMock(return_value=TutorTurn(
+            type="explanation",
+            text="Hello! This is a test response.",
+            expected="",
+            feedback="",
+        ))
+        # Mock speak to return a fake SynthesisResult
+        mock_tutor.speak = MagicMock(return_value=SynthesisResult(
+            audio_bytes=b"fake_audio_data",
+            duration_ms=1000,
+        ))
+        # Mock _voice_for_turn to return a voice profile
+        mock_tutor._voice_for_turn = MagicMock(return_value="alloy")
+
+        # Mock stream_audio_chunks
+        mock_audio_chunks = create_async_iter([sample_audio_chunk])
+
+        # Mock stream_transcribe to yield a final transcript
+        mock_transcribe = create_async_iter([
+            {"type": "final", "text": "Hello world"}
+        ])
+
+        with patch("lingua.agent.harness.stream_audio_chunks", return_value=mock_audio_chunks):
+            with patch("lingua.agent.harness.stream_transcribe", return_value=mock_transcribe):
+                with patch("lingua.agent.harness.sd") as mock_sd:
+                    harness = VoiceAgentHarness(tutor=mock_tutor)
+                    await harness.run()
+
+        # Verify speak was called with the response text and voice profile
+        mock_tutor.speak.assert_called_once_with(
+            "Hello! This is a test response.",
+            "alloy",
+        )
+        # Verify sounddevice.play was called
+        mock_sd.play.assert_called_once_with(b"fake_audio_data", sample_rate=16000)
+        # Verify sounddevice.wait was called to ensure playback completes
+        mock_sd.wait.assert_called_once()
