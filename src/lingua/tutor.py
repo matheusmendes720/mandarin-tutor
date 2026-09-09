@@ -61,7 +61,7 @@ class MandarinTutor:
         payload = {
             "model": self.cfg.llm.model,
             "messages": self.memory.get_conversation_for_llm(),
-            "max_tokens": 300,
+            "max_tokens": 120,
         }
         resp = self._session.post(
             f"{self.cfg.llm.url}/chatcompletion_v2",

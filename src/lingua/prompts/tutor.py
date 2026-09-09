@@ -27,7 +27,9 @@ TONE DRILL FORMAT:
 - Ask student to say it with the correct tone.
 - Give immediate feedback.
 
-Keep each turn short — 1-2 sentences max for drill turns. NEVER imitate the user's random language."""
+Keep each turn short — 1-2 sentences max for drill turns. NEVER imitate the user's random language.
+
+Keep responses under 60 words. One Mandarin sentence + brief English explanation max."""
 
 
 def build_drill_turn(word: str, pinyin: str, translation: str, turn_type: str = "vocab_drill") -> str:
