@@ -21,6 +21,7 @@ from ..hud.events import (
     LlmDoneEvent,
     TtsStartEvent,
     TtsDoneEvent,
+    LogEvent,
 )
 from .router import TurnRouter
 from .vad import VoiceActivityDetector
@@ -77,6 +78,13 @@ class VoiceAgentHarness:
         # VoiceStudio client for ASR
         self._vs = VoiceStudioClient("http://127.0.0.1:3900")
 
+    def _log(self, message: str, level: str = "info") -> None:
+        """Publish a log message to the event bus (HUD renders it inside the TUI)."""
+        if self.event_bus:
+            self.event_bus.publish(
+                LogEvent(ts=time.monotonic(), level=level, message=message)
+            )
+
     async def run(self) -> None:
         """Run the voice agent loop.
 
@@ -86,7 +94,7 @@ class VoiceAgentHarness:
         multiple back-and-forth turns.
         """
         while True:
-            print("   [listening...]")
+            self._log("listening...")
             # Create a queue for passing audio chunks from capture to ASR
             audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
 
@@ -135,7 +143,7 @@ class VoiceAgentHarness:
             raise
         finally:
             # Signal end of audio
-            print("   [silence detected — processing...]")
+            self._log("silence detected — processing...")
             await queue.put(b"")
 
     async def _transcribe_audio(self, queue: asyncio.Queue[bytes]) -> None:
@@ -169,7 +177,7 @@ class VoiceAgentHarness:
                 elif result_type == "partial":
                     logger.debug("ASR partial: %s", text)
                 elif result_type == "final":
-                    print(f"   [heard: {text!r}]")
+                    self._log(f"heard: {text!r}")
                     # Only process non-empty transcripts
                     if text.strip():
                         # Publish ASR final event
@@ -248,12 +256,14 @@ class VoiceAgentHarness:
                         )
                     )
 
-                print(f"   [tutor: {turn.text[:60]!r}{'...' if len(turn.text) > 60 else ''}]")
+                self._log(f"tutor: {turn.text[:80]!r}{'...' if len(turn.text) > 80 else ''}")
                 speed = self.tutor._speed_for_turn(turn)
                 result = self.tutor.speak(turn.text, voice_profile, speed=speed)
                 # result.audio_bytes is raw PCM int16 LE; sample rate is in result.sample_rate
                 # (VoiceStudio TTS returns 24kHz PCM)
-                print(f"   [🔊 playing {len(result.audio_bytes)}b @ {result.sample_rate}Hz speed={speed}x...]")
+                self._log(
+                    f"🔊 playing {len(result.audio_bytes)}b @ {result.sample_rate}Hz speed={speed}x",
+                )
                 t1 = time.monotonic()
                 audio_arr = np.frombuffer(result.audio_bytes, dtype=np.int16)
                 sd.play(audio_arr, samplerate=result.sample_rate)
@@ -268,7 +278,7 @@ class VoiceAgentHarness:
                         )
                     )
 
-                print("   [listening...]")
+                self._log("listening...")
 
         except Exception as e:
             logger.error("Error processing transcript: %s", e)
