@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,14 @@ from ..audio_loop import stream_audio_chunks
 from ..asr import stream_transcribe
 from ..tutor import MandarinTutor
 from ..voice_studio import VoiceStudioClient
+from ..hud.bus import EventBus
+from ..hud.events import (
+    AsrFinalEvent,
+    LlmStartEvent,
+    LlmDoneEvent,
+    TtsStartEvent,
+    TtsDoneEvent,
+)
 from .router import TurnRouter
 from .vad import VoiceActivityDetector
 
@@ -34,6 +43,7 @@ class VoiceAgentHarness:
         config: LinguaConfig | None = None,
         sample_rate: int = 16000,
         channels: int = 1,
+        event_bus: EventBus | None = None,
     ) -> None:
         """Initialize the voice agent harness.
 
@@ -47,11 +57,14 @@ class VoiceAgentHarness:
             Audio sample rate (default 16000).
         channels : int
             Number of audio channels (default 1).
+        event_bus : EventBus, optional
+            Optional event bus for publishing pipeline events.
         """
         self.tutor = tutor
         self.config = config
         self.sample_rate = sample_rate
         self.channels = channels
+        self.event_bus = event_bus
 
         # Voice activity detector for turn switching
         self._vad = VoiceActivityDetector(energy_threshold=0.01)
@@ -158,6 +171,15 @@ class VoiceAgentHarness:
                     print(f"   [heard: {text!r}]")
                     # Only process non-empty transcripts
                     if text.strip():
+                        # Publish ASR final event
+                        if self.event_bus:
+                            self.event_bus.publish(
+                                AsrFinalEvent(
+                                    ts=time.monotonic(),
+                                    text=text,
+                                    language=result.get("language", "zh"),
+                                )
+                            )
                         # Build segments with language detection (default to zh for now)
                         segments = [{"text": text, "language": result.get("language", "zh")}]
                         await self._process_transcript(segments)
@@ -186,7 +208,25 @@ class VoiceAgentHarness:
             # Determine turn type from routing
             turn_type = routed.type
 
+            # Publish LLM start event
+            if self.event_bus:
+                self.event_bus.publish(
+                    LlmStartEvent(ts=time.monotonic(), prompt_chars=len(text))
+                )
+
+            t0 = time.monotonic()
             turn = self.tutor._ask_llm(text)
+
+            # Publish LLM done event
+            if self.event_bus:
+                self.event_bus.publish(
+                    LlmDoneEvent(
+                        ts=time.monotonic(),
+                        response_chars=len(turn.text),
+                        duration_ms=int((time.monotonic() - t0) * 1000),
+                    )
+                )
+
             logger.info(
                 "Tutor response: type=%s, text=%s",
                 turn.type,
@@ -196,12 +236,34 @@ class VoiceAgentHarness:
             # Synthesize and play TTS response (blocking fallback)
             if turn.text:
                 voice_profile = self.tutor._voice_for_turn(turn)
+
+                # Publish TTS start event
+                if self.event_bus:
+                    self.event_bus.publish(
+                        TtsStartEvent(
+                            ts=time.monotonic(),
+                            text_chars=len(turn.text),
+                            voice=voice_profile,
+                        )
+                    )
+
                 print(f"   [tutor: {turn.text[:60]!r}{'...' if len(turn.text) > 60 else ''}]")
                 result = self.tutor.speak(turn.text, voice_profile)
                 # Play audio using blocking playback
                 print("   [🔊 playing response...]")
+                t1 = time.monotonic()
                 sd.play(result.audio_bytes, sample_rate=16000)
                 sd.wait()  # Ensure playback completes before continuing
+
+                # Publish TTS done event
+                if self.event_bus:
+                    self.event_bus.publish(
+                        TtsDoneEvent(
+                            ts=time.monotonic(),
+                            duration_ms=int((time.monotonic() - t1) * 1000),
+                        )
+                    )
+
                 print("   [listening...]")
 
         except Exception as e:
