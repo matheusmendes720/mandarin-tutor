@@ -7,6 +7,7 @@ import time
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
+import numpy as np
 import sounddevice as sd
 
 from ..audio_loop import stream_audio_chunks
@@ -249,10 +250,11 @@ class VoiceAgentHarness:
 
                 print(f"   [tutor: {turn.text[:60]!r}{'...' if len(turn.text) > 60 else ''}]")
                 result = self.tutor.speak(turn.text, voice_profile)
-                # Play audio using blocking playback
-                print("   [🔊 playing response...]")
+                # result.audio_bytes is raw PCM int16 LE (response_format="pcm" from VoiceStudio)
+                print(f"   [🔊 playing {len(result.audio_bytes)}b response...]")
                 t1 = time.monotonic()
-                sd.play(result.audio_bytes, sample_rate=16000)
+                audio_arr = np.frombuffer(result.audio_bytes, dtype=np.int16)
+                sd.play(audio_arr, samplerate=16000)
                 sd.wait()  # Ensure playback completes before continuing
 
                 # Publish TTS done event

@@ -52,7 +52,7 @@ class VoiceStudioClient:
         text: str,
         profile_id: str,
         engine: str = "openai",
-        response_format: str = "mp3",
+        response_format: str = "pcm",
         speed: float = 1.0,
     ) -> SynthesisResult:
         """Generate speech via VoiceStudio TTS.
