@@ -15,35 +15,78 @@ from . import config as cfg
 from .voice_studio import VoiceStudioClient, SynthesisResult
 
 
+# ---------------------------------------------------------------------------
+# RMS computation helpers
+# ---------------------------------------------------------------------------
+def compute_rms(chunk: bytes) -> float:
+    """Compute normalized RMS of int16 PCM chunk.
+
+    Returns a value in [0.0, 1.0].
+    """
+    arr = np.frombuffer(chunk, dtype=np.int16).astype(np.float32)
+    if arr.size == 0:
+        return 0.0
+    return float(np.sqrt(np.mean(arr * arr)) / 32768.0)
+
+
+def is_speech(rms: float, threshold: float = 0.05) -> bool:
+    """True if RMS exceeds speech threshold (raised from 0.01)."""
+    return rms > threshold
+
+
+# ---------------------------------------------------------------------------
+# Audio streaming
+# ---------------------------------------------------------------------------
 async def stream_audio_chunks(
     sample_rate: int = 16000,
     channels: int = 1,
     chunk_ms: int = 160,
-    silence_threshold: float = 0.01,
+    silence_threshold: float = 150.0,
     max_seconds: float = 30.0,
+    min_speech_seconds: float = 0.3,
+    on_rms: Callable[[float, bool], None] | None = None,
 ) -> AsyncIterator[bytes]:
-    """Yield raw PCM chunks while recording. Stops on silence.
+    """Yield raw PCM chunks (int16, mono, 16kHz) while recording. Stops on silence.
+
+    Opens the device at its NATIVE sample rate and channel count (avoiding
+    PortAudio resample artifacts on Windows that caused the silent-mic bug),
+    then resamples to `sample_rate` and downmixes to `channels` before yielding.
 
     Parameters
     ----------
     sample_rate : int
-        Audio sample rate in Hz.
+        Target output sample rate (default 16000).
     channels : int
-        Number of audio channels.
+        Target output channel count (default 1 = mono).
     chunk_ms : int
-        Chunk duration in milliseconds.
+        Output chunk duration in milliseconds.
     silence_threshold : float
-        RMS threshold below which audio is considered silence.
+        Raw int16 RMS below which audio is silence. Default 150 — calibrated
+        for the Microphone Array (Intel Smart Sound) on Windows where loud
+        speech peaks ~400-800 and ambient noise stays <50. Raise if ambient
+        noise triggers false speech; lower if speech doesn't trigger.
     max_seconds : float
         Maximum recording duration in seconds.
+    min_speech_seconds : float
+        Minimum duration of speech required before stopping on silence.
+    on_rms : callable, optional
+        Callback called with (rms, is_speech) for each chunk.
 
     Yields
     ------
     bytes
-        Raw PCM int16 audio chunks.
+        Raw PCM int16 audio at `sample_rate`, `channels`.
     """
-    frames_per_chunk = int(sample_rate * (chunk_ms / 1000))
-    required_silent_frames = int(sample_rate * 0.5)  # 0.5s silence to stop
+    # Resolve device native format to avoid PortAudio resample breakage
+    in_dev = sd.query_devices(kind="input")
+    native_sr = int(in_dev.get("default_samplerate", 44100))
+    native_ch = max(channels, min(2, in_dev.get("max_input_channels", 1)))
+
+    resample_needed = native_sr != sample_rate
+
+    output_frames_per_chunk = int(sample_rate * (chunk_ms / 1000))
+    native_frames_per_chunk = int(native_sr * (chunk_ms / 1000))
+    required_silent_frames = int(sample_rate * 1.5)  # 1.5s silence to stop
     running = True
 
     def audio_gen():
@@ -51,17 +94,19 @@ async def stream_audio_chunks(
         nonlocal running
         q: list[np.ndarray] = []
         silence_frames = 0
+        had_speech = False
+        speech_chunks_ago = 0
 
         def callback(indata: np.ndarray, _frame_count: int, _time_info, _status: sd.CallbackFlags) -> None:
             q.append(indata.copy())
 
         import time
         stream = sd.InputStream(
-            samplerate=sample_rate,
-            channels=channels,
+            samplerate=native_sr,
+            channels=native_ch,
             dtype="int16",
             callback=callback,
-            blocksize=frames_per_chunk,
+            blocksize=native_frames_per_chunk,
         )
 
         try:
@@ -78,15 +123,46 @@ async def stream_audio_chunks(
                     if elapsed > max_seconds:
                         running = False
                         break
-                    rms = float(np.sqrt(np.mean(chunk.astype(float) ** 2)))
-                    if rms < silence_threshold:
-                        silence_frames += len(chunk)
+
+                    # Take channel 0 only (Windows 4-channel devices have broken ch 2-3)
+                    if chunk.ndim > 1 and chunk.shape[1] > 1:
+                        mono = chunk[:, 0]
+                    else:
+                        mono = chunk.flatten()
+
+                    rms_raw = float(np.sqrt(np.mean(mono.astype(np.float32) ** 2)))
+                    speech = rms_raw > silence_threshold
+
+                    if speech:
+                        had_speech = True
+                        speech_chunks_ago = 0
+                    else:
+                        speech_chunks_ago += 1
+
+                    if on_rms is not None:
+                        on_rms(rms_raw, speech)
+
+                    # Only stop on silence if we've heard real speech in the last 30 chunks
+                    speech_recently = had_speech and speech_chunks_ago <= 30
+                    if rms_raw < silence_threshold and speech_recently:
+                        silence_frames += native_frames_per_chunk
                         if silence_frames >= required_silent_frames:
                             running = False
                             break
                     else:
                         silence_frames = 0
-                    yield chunk
+
+                    # Resample native_sr -> sample_rate if needed (linear interp, fine for speech)
+                    if resample_needed:
+                        ratio = sample_rate / native_sr
+                        n_out = max(1, int(len(mono) * ratio))
+                        x_old = np.arange(len(mono))
+                        x_new = np.linspace(0, len(mono) - 1, n_out)
+                        out = np.interp(x_new, x_old, mono.astype(np.float32)).astype(np.int16)
+                    else:
+                        out = mono.astype(np.int16)
+
+                    yield out
         finally:
             running = False
 
@@ -106,7 +182,7 @@ async def stream_audio_chunks(
             break
         if chunk is None:
             break
-        yield chunk.flatten().tobytes()
+        yield chunk.tobytes()
 
 
 class AudioLoop:
@@ -151,7 +227,8 @@ class AudioLoop:
                     continue
                 chunk = q.pop(0)
                 total_frames += len(chunk)
-                rms = float(np.sqrt(np.mean(chunk.astype(float) ** 2)))
+                # Use extracted RMS helper
+                rms = compute_rms(chunk.flatten().tobytes())
                 if rms < silence_threshold:
                     silence_frames += len(chunk)
                     if silence_frames >= required_silent:
