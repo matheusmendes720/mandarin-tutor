@@ -1,0 +1,19 @@
+# Lingua configuration
+[voicestudio]
+url = "http://127.0.0.1:3900"
+voice_mandarin = "8c53222c"
+voice_english = "demo0001"
+engine = "openai"
+
+[llm]
+provider = "minimax"
+url = "https://api.minimax.io/v1/text"
+model = "MiniMax-M3"
+
+[audio]
+sample_rate = 16000
+channels = 1
+chunk_duration_ms = 100
+
+[vocab]
+store_path = "data/vocab.json"
