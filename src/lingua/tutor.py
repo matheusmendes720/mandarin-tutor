@@ -76,13 +76,39 @@ class MandarinTutor:
             return self.cfg.voicestudio.voice_english
         return self.cfg.voicestudio.voice_mandarin
 
-    def speak(self, text: str, voice_profile: str | None = None) -> SynthesisResult:
-        """Synthesize text using VoiceStudio TTS."""
+    def _speed_for_turn(self, turn: TutorTurn) -> float:
+        # English at normal speed (1.0x); Mandarin drills at 0.75x so the
+        # tones are easier to follow.
+        if turn.type == "explanation":
+            return 1.0
+        return 0.75
+
+    def speak(self, text: str, voice_profile: str | None = None, speed: float = 1.0) -> SynthesisResult:
+        """Synthesize text using VoiceStudio TTS.
+
+        Parameters
+        ----------
+        text : str
+            Text to speak.
+        voice_profile : str, optional
+            VoiceStudio voice ID (defaults to Mandarin).
+        speed : float
+            Playback speed multiplier (0.25 to 4.0 per server spec).
+        """
         profile = voice_profile or self.cfg.voicestudio.voice_mandarin
         return self.vs.synthesize(
             text,
             profile_id=profile,
             engine=self.cfg.voicestudio.engine,
+            speed=speed,
+        )
+
+    def speak_turn(self, turn: TutorTurn) -> SynthesisResult:
+        """Speak a TutorTurn, picking voice + speed from its type."""
+        return self.speak(
+            turn.text,
+            voice_profile=self._voice_for_turn(turn),
+            speed=self._speed_for_turn(turn),
         )
 
     # ------------------------------------------------------------------

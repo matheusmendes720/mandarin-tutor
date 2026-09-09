@@ -249,10 +249,11 @@ class VoiceAgentHarness:
                     )
 
                 print(f"   [tutor: {turn.text[:60]!r}{'...' if len(turn.text) > 60 else ''}]")
-                result = self.tutor.speak(turn.text, voice_profile)
+                speed = self.tutor._speed_for_turn(turn)
+                result = self.tutor.speak(turn.text, voice_profile, speed=speed)
                 # result.audio_bytes is raw PCM int16 LE; sample rate is in result.sample_rate
                 # (VoiceStudio TTS returns 24kHz PCM)
-                print(f"   [🔊 playing {len(result.audio_bytes)}b @ {result.sample_rate}Hz response...]")
+                print(f"   [🔊 playing {len(result.audio_bytes)}b @ {result.sample_rate}Hz speed={speed}x...]")
                 t1 = time.monotonic()
                 audio_arr = np.frombuffer(result.audio_bytes, dtype=np.int16)
                 sd.play(audio_arr, samplerate=result.sample_rate)
