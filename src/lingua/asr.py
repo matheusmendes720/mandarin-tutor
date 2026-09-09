@@ -129,16 +129,27 @@ async def stream_transcribe(
 
     encoder = PcmToOpusEncoder(sample_rate=sample_rate, channels=channels)
 
+    # Buffer WebM output and only send when we have a self-contained chunk.
+    # Partial WebM containers fail to decode on the server (EBML header
+    # parsing error). Buffering until >= 8KB guarantees every send is a
+    # valid WebM stream.
+    webm_buffer = b""
+    SEND_THRESHOLD = 8192
+
     async with websockets.connect(url) as ws:
-        # Encode + send PCM chunks as WebM/Opus incrementally
         async for chunk in chunks:
             webm = encoder.feed(chunk)
             if webm:
-                await ws.send(webm)
+                webm_buffer += webm
+            if len(webm_buffer) >= SEND_THRESHOLD:
+                await ws.send(webm_buffer)
+                webm_buffer = b""
         # Flush encoder and send remaining WebM bytes
         tail = encoder.flush()
         if tail:
-            await ws.send(tail)
+            webm_buffer += tail
+        if webm_buffer:
+            await ws.send(webm_buffer)
 
         # Signal end of audio
         await ws.send(json.dumps({"type": "input_audio.end"}))
