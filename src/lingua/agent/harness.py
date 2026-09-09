@@ -12,6 +12,7 @@ from ..audio_loop import stream_audio_chunks
 from ..asr import stream_transcribe
 from ..tutor import MandarinTutor
 from ..voice_studio import VoiceStudioClient
+from .vad import VoiceActivityDetector
 
 if TYPE_CHECKING:
     from ..config import LinguaConfig
@@ -50,6 +51,11 @@ class VoiceAgentHarness:
         self.config = config
         self.sample_rate = sample_rate
         self.channels = channels
+
+        # Voice activity detector for turn switching
+        self._vad = VoiceActivityDetector(energy_threshold=0.01)
+        # State: "listening" | "speaking"
+        self._state = "listening"
 
         # VoiceStudio client for ASR
         self._vs = VoiceStudioClient("http://127.0.0.1:3900")
