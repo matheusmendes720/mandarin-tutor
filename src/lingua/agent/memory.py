@@ -37,6 +37,26 @@ class ConversationMemory:
                 self.turns = [MemoryTurn(**t) for t in data]
             else:
                 self.turns = [MemoryTurn(**t) for t in data.get("turns", [])]
+            # Sanitize: legacy bug stored the system prompt under role="user".
+            # Heuristic: the very first turn (which is the initial system prompt
+            # by convention) and the text starts with "You are a" — the start of
+            # all our tutor system prompts. Refuse to heal any other user turn.
+            if (
+                self.turns
+                and self.turns[0].role == "user"
+                and self.turns[0].text.lstrip().startswith("You are a")
+                and self.turns[0].text != "You are an idiot"
+            ):
+                first = self.turns[0]
+                self.turns[0] = MemoryTurn(
+                    id=first.id,
+                    role="system",
+                    text=first.text,
+                    pinyin=first.pinyin,
+                    language=first.language,
+                    timestamp=first.timestamp,
+                )
+                self.save()
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
