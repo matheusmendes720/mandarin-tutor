@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+data/
+.env
+.env.local
+.env.example
+lingua.env
+tmp/
+.pytest_temp/
+=*
+docs/_archived/

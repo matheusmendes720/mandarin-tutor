@@ -282,8 +282,13 @@ class VoiceAgentHarness:
 
             # The stream_response helper doesn't know about TutorTurn schema;
             # synthesize a turn from the accumulated text so downstream code
-            # doesn't change.
-            turn = TutorTurn(type="explanation", text=full_text)
+            # doesn't change. Use the LLM's parsed type if available.
+            turn_type = "explanation"
+            if llm_parsed and isinstance(llm_parsed, dict):
+                turn_type = llm_parsed.get("type", "explanation")
+            if turn_type not in {"explanation", "vocab_drill", "tone_drill", "dialogue", "correction"}:
+                turn_type = "explanation"
+            turn = TutorTurn(type=turn_type, text=full_text)
 
             # Publish LLM done event
             if self.event_bus:

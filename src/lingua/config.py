@@ -37,9 +37,7 @@ class AudioConfig:
 @dataclass
 class VocabConfig:
     store_path: Path = Path("data/vocab.json")
-    source_path: Path = Path(
-        "G:/Other computers/My Laptop/notas_estudo/2_projeto/mandarin-learning"
-    )
+    source_path: Path = field(default_factory=lambda: Path("data/mandarin-learning"))
 
 
 @dataclass
@@ -99,10 +97,7 @@ class LinguaConfig:
                 store_path=Path(expand(vocab_raw.get("store_path", "data/vocab.json"))),
                 source_path=Path(
                     expand(
-                        vocab_raw.get(
-                            "source_path",
-                            "G:/Other computers/My Laptop/notas_estudo/2_projeto/mandarin-learning",
-                        )
+                        vocab_raw.get("source_path", "data/mandarin-learning"),
                     )
                 ),
             ),
