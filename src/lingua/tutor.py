@@ -6,11 +6,20 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Callable
 import requests
 
 from pypinyin import lazy_pinyin, Style
+
+
+class TutorTurnType(str, Enum):
+    EXPLANATION = "explanation"
+    VOCAB_DRILL = "vocab_drill"
+    TONE_DRILL = "tone_drill"
+    DIALOGUE = "dialogue"
+    CORRECTION = "correction"
 
 from . import config as cfg
 from .prompts import SYSTEM_PROMPT
@@ -72,7 +81,7 @@ def to_pinyin(text: str) -> str:
 
 @dataclass
 class TutorTurn:
-    type: str  # explanation | vocab_drill | tone_drill | dialogue
+    type: TutorTurnType  # explanation | vocab_drill | tone_drill | dialogue
     text: str
     expected: str = ""
     feedback: str = ""
@@ -227,29 +236,34 @@ class MandarinTutor:
         self.memory.add_turn("assistant", content)
         try:
             obj = json.loads(content)
+            try:
+                turn_type = TutorTurnType(obj.get("type", "explanation"))
+            except ValueError:
+                logger.warning("Invalid TutorTurnType %r, falling back to EXPLANATION", obj.get("type"))
+                turn_type = TutorTurnType.EXPLANATION
             return TutorTurn(
-                type=obj.get("type", "explanation"),
+                type=turn_type,
                 text=obj.get("text", ""),
                 expected=obj.get("expected", ""),
                 feedback=obj.get("feedback", ""),
             )
         except json.JSONDecodeError:
             logger.warning("LLM returned non-JSON, falling back: %s", content[:100])
-            return TutorTurn(type="explanation", text=content, expected="", feedback="")
+            return TutorTurn(type=TutorTurnType.EXPLANATION, text=content, expected="", feedback="")
 
     # ------------------------------------------------------------------
     # TTS — selects voice based on language
     # ------------------------------------------------------------------
     def _voice_for_turn(self, turn: TutorTurn) -> str:
         # Explanation = English voice; drills = Mandarin voice
-        if turn.type == "explanation":
+        if turn.type == TutorTurnType.EXPLANATION:
             return self.cfg.voicestudio.voice_english
         return self.cfg.voicestudio.voice_mandarin
 
     def _speed_for_turn(self, turn: TutorTurn) -> float:
         # English at normal speed (1.0x); Mandarin drills at 0.75x so the
         # tones are easier to follow.
-        if turn.type == "explanation":
+        if turn.type == TutorTurnType.EXPLANATION:
             return 1.0
         return 0.75
 
@@ -280,26 +294,3 @@ class MandarinTutor:
             voice_profile=self._voice_for_turn(turn),
             speed=self._speed_for_turn(turn),
         )
-
-    # ------------------------------------------------------------------
-    # High-level turns
-    # ------------------------------------------------------------------
-    def next_drill(self, student_input: str | None = None) -> TutorTurn:
-        """Get the next tutor turn.
-
-        If student_input is provided, it is sent as feedback/reply.
-        Otherwise a new drill or explanation is generated.
-        """
-        if student_input:
-            msg = f"Student replied: {student_input}\nGive feedback and continue the drill."
-        else:
-            msg = "Give me a short vocab drill turn."
-        return self._ask_llm(msg)
-
-    def start_dialogue(self, topic: str) -> TutorTurn:
-        """Start a short dialogue on a given topic."""
-        return self._ask_llm(f"Start a short dialogue about: {topic}")
-
-    def review_and_drill(self) -> TutorTurn:
-        """Run a mixed tone + vocab review."""
-        return self._ask_llm("Run a short mixed review: one tone drill, one vocab drill.")

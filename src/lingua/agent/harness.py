@@ -24,9 +24,8 @@ from ..hud.events import (
     LogEvent,
 )
 from ..recorder import SessionRecorder, Turn
-from ..tutor import TutorTurn, to_pinyin
+from ..tutor import TutorTurn, TutorTurnType, to_pinyin
 from .router import TurnRouter
-from .vad import VoiceActivityDetector
 
 if TYPE_CHECKING:
     from ..config import LinguaConfig
@@ -48,6 +47,8 @@ class VoiceAgentHarness:
         sample_rate: int = 16000,
         channels: int = 1,
         event_bus: EventBus | None = None,
+        input_device_name: str = "",
+        output_device_name: str = "",
     ) -> None:
         """Initialize the voice agent harness.
 
@@ -63,6 +64,10 @@ class VoiceAgentHarness:
             Number of audio channels (default 1).
         event_bus : EventBus, optional
             Optional event bus for publishing pipeline events.
+        input_device_name : str
+            Name of input audio device (for session logging).
+        output_device_name : str
+            Name of output audio device (for session logging).
         """
         self.tutor = tutor
         self.config = config
@@ -70,26 +75,20 @@ class VoiceAgentHarness:
         self.channels = channels
         self.event_bus = event_bus
 
-        # Voice activity detector for turn switching
-        self._vad = VoiceActivityDetector(energy_threshold=0.01)
-        # Turn router for multi-lingual routing
-        self._router = TurnRouter()
         # State: "listening" | "speaking"
         self._state = "listening"
+
+        # Turn router for multi-lingual routing
+        self._router = TurnRouter()
 
         # VoiceStudio client for ASR
         self._vs = VoiceStudioClient("http://127.0.0.1:3900")
 
-        # Session recorder — writes one JSON file per run for offline
-        # analysis of stuck turns, latency, and ASR errors. Created lazily
-        # on first turn to avoid touching disk at import time.
-        from ..recorder import SessionRecorder
-        self._recorder = SessionRecorder()
+        # Session recorder — created lazily in _run_loop after device names are known.
+        self._input_device_name = input_device_name
+        self._output_device_name = output_device_name
+        self._recorder = None
         self._recorder_seq = 1
-        self._recorder.start(
-            input_device=getattr(self, "_input_device_name", "?"),
-            output_device=getattr(self, "_output_device_name", "?"),
-        )
 
     def _log(self, message: str, level: str = "info") -> None:
         """Publish a log message to the event bus (HUD renders it inside the TUI)."""
@@ -106,14 +105,23 @@ class VoiceAgentHarness:
         tutor for processing. Loops continuously so the user can have
         multiple back-and-forth turns.
         """
+        # Lazy-init the recorder now that device names are known
+        from ..recorder import SessionRecorder
+        self._recorder = SessionRecorder()
+        self._recorder.start(
+            input_device=self._input_device_name or "?",
+            output_device=self._output_device_name or "?",
+        )
+
         try:
             await self._run_loop()
         finally:
             # Always close the session log so a crash leaves a readable file.
             try:
-                path = self._recorder.finish()
-                if path:
-                    print(f"\n[session log: {path}]")
+                if self._recorder:
+                    path = self._recorder.finish()
+                    if path:
+                        print(f"\n[session log: {path}]")
             except Exception as rec_err:
                 print(f"\n[recorder error: {rec_err!r}]")
 
@@ -132,8 +140,16 @@ class VoiceAgentHarness:
             )
 
             try:
-                # Run both tasks concurrently until one finishes
-                await asyncio.gather(capture_task, asr_task)
+                # Run both tasks concurrently with timeout
+                await asyncio.wait_for(
+                    asyncio.gather(capture_task, asr_task),
+                    timeout=60,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Audio capture/transcribe timeout, continuing...")
+                capture_task.cancel()
+                asr_task.cancel()
+                await asyncio.gather(capture_task, asr_task, return_exceptions=True)
             except asyncio.CancelledError:
                 logger.info("VoiceAgentHarness cancelled, cleaning up tasks...")
                 capture_task.cancel()
@@ -283,11 +299,10 @@ class VoiceAgentHarness:
             # The stream_response helper doesn't know about TutorTurn schema;
             # synthesize a turn from the accumulated text so downstream code
             # doesn't change. Use the LLM's parsed type if available.
-            turn_type = "explanation"
-            if llm_parsed and isinstance(llm_parsed, dict):
-                turn_type = llm_parsed.get("type", "explanation")
-            if turn_type not in {"explanation", "vocab_drill", "tone_drill", "dialogue", "correction"}:
-                turn_type = "explanation"
+            try:
+                turn_type = TutorTurnType(llm_parsed.get("type") if llm_parsed and isinstance(llm_parsed, dict) else "explanation")
+            except ValueError:
+                turn_type = TutorTurnType.EXPLANATION
             turn = TutorTurn(type=turn_type, text=full_text)
 
             # Publish LLM done event
