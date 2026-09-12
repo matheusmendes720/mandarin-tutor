@@ -2,6 +2,9 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     import tomllib
@@ -65,6 +68,7 @@ class LinguaConfig:
             if package_path.exists():
                 path = package_path
         if not path.exists():
+            logger.warning("lingua.toml not found at %s, using defaults (api_key from env or empty)", path)
             return cls.defaults()
         with open(path, "rb") as f:
             raw = tomllib.load(f)

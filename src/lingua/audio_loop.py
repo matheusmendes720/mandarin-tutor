@@ -268,7 +268,9 @@ class AudioLoop:
                 audio_data = np.frombuffer(frames, dtype=np.int16)
             sd.play(audio_data, samplerate=sample_rate, channels=n_channels)
             sd.sleep(int(len(audio_data) / sample_rate * 1000) + 200)
-        except Exception:
+        except (OSError, subprocess.SubprocessError) as e:
+            import logging
+            logging.getLogger(__name__).error("WAV playback failed: %s", e)
             # Try MP3 — fall back to temp file + os media player
             tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
             tmp.write(audio_bytes)
@@ -280,9 +282,9 @@ class AudioLoop:
                     ["powershell", "-c", f"(New-Object Media.SoundPlayer '{tmp.name}').PlaySync()"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 )
-            except Exception:
-                # Last resort: just skip playback silently
-                pass
+            except (OSError, subprocess.SubprocessError) as e:
+                import logging
+                logging.getLogger(__name__).error("MP3 fallback failed: %s", e)
             finally:
                 try: os.unlink(tmp.name)
                 except Exception: pass

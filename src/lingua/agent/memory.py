@@ -81,7 +81,7 @@ class ConversationMemory:
             MemoryTurn(
                 id=str(uuid.uuid4()),
                 role="system",
-                text=f"[Earlier conversation summary: {summary_text[:200]}...]",
+                text=f"[Earlier conversation summary: {summary_text[:800]}...]",
             )
         ] + self.turns[len(self.turns) // 2 :]
 
